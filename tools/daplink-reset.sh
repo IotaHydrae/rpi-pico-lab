@@ -32,6 +32,7 @@ sudo ${OPENOCD_BIN} -s ${OPENOCD_DIR}/tcl \
     -f ${OPENOCD_DIR}/tcl/interface/${INTERFACE} \
     -f ${OPENOCD_DIR}/tcl/target/${TARGET} -c \
 "
+    adapter speed ${ADAPTER_SPEED};
     init;
     reset;
     shutdown;
@@ -41,6 +42,7 @@ sudo ${OPENOCD_BIN} \
     -f interface/${INTERFACE} \
     -f target/${TARGET} -c \
 "
+    adapter speed ${ADAPTER_SPEED};
     init;
     reset;
     shutdown;
