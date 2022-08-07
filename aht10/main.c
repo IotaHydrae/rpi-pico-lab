@@ -5,8 +5,6 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 
-
-
 int main()
 {
 	int rc;
@@ -53,7 +51,7 @@ int main()
 		/* raw data */
 		printf("\tRegisters: ");
 		for(int i=0;i<6;i++){
-			printf("%02x", rbuf[i]);
+			printf("%02x ", rbuf[i]);
 		}
 		printf("\n");
 		sleep_ms(2000);

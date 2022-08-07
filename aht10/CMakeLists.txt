@@ -10,11 +10,12 @@ project(aht10)
 pico_sdk_init()
 
 # rest of your project
-add_executable(aht10 main.c)
+add_executable(aht10 main.c aht10.c)
 
+target_include_directories(aht10 PUBLIC .)
 target_link_libraries(aht10 pico_stdlib hardware_i2c)
 
-pico_enable_stdio_usb(aht10 1)
-pico_enable_stdio_uart(aht10 0)
+pico_enable_stdio_usb(aht10 0)
+pico_enable_stdio_uart(aht10 1)
 
 pico_add_extra_outputs(aht10)
