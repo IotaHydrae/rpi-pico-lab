@@ -26,7 +26,7 @@ int main()
 		printf("Hello, world!\n");
 		for (int x = 0; x < 128; x++)
 		{
-			for (int y = 0; y < 64; y++)
+			for (int y = 0; y < 32; y++)
 			{
 				ssd1306_set_pixel(x, y, 1);
 			}
@@ -37,7 +37,7 @@ int main()
 
 		for (int x = 0; x < 128; x++)
 		{
-			for (int y = 0; y < 64; y++)
+			for (int y = 0; y < 32; y++)
 			{
 				ssd1306_set_pixel(x, y, 0);
 			}
