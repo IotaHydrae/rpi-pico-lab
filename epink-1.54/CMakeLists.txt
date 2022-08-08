@@ -10,7 +10,7 @@ project(epink)
 pico_sdk_init()
 
 # rest of your project
-add_executable(epink main.c)
+add_executable(epink main.c font_mini_4x6.c font_8x16.c)
 
 target_include_directories(epink PUBLIC .)
 target_link_libraries(epink pico_stdlib hardware_spi)
