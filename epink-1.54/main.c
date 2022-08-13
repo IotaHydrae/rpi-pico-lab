@@ -73,9 +73,24 @@
 #define EPINK_UPDATE_MODE_PART 2
 
 #define EPINK_DISP_BUFFER_SIZE (EPINK_WIDTH*EPINK_HEIGHT/8)
-#define EPINK_DISP_BUFFER_OFFSET(p,x)(p*EPINK_WIDTH + (x-1))
+#define EPINK_DISP_BUFFER_OFFSET(p,x)(p*EPINK_WIDTH + x)
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
+// #define EPINK_DEBUG_MODE
+#define EPINK_COORD_CHECK
+#ifdef EPINK_DEBUG_MODE
+    #define EPINK_DEBUG(...) printf(__VA_ARGS__)
+#else
+    #define EPINK_DEBUG
+#endif
+
+#define TEST_DOC "This document describes how to write an ALSA \
+(Advanced Linux Sound Architecture) driver. The document focuses \
+mainly on PCI soundcards. In the case of other device types, the \
+API might be different, too. However, at least the ALSA kernel \
+API is consistent, and therefore it would be still a bit help \
+for writing them."
 
 static const unsigned char EPD_1IN54_lut_full_update[] = {
     0x02, 0x02, 0x01, 0x11, 0x12, 0x12, 0x22, 0x22,
@@ -91,7 +106,7 @@ static const unsigned char EPD_1IN54_lut_partial_update[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-static uint8_t epink_disp_buffer[EPINK_WIDTH * EPINK_HEIGHT / 8] = {EPINK_COLOR_BLACK};
+static uint8_t epink_disp_buffer[EPINK_DISP_BUFFER_SIZE];
 
 extern unsigned char fontdata_mini_4x6[1536];
 extern unsigned char fontdata_8x16[4096];
@@ -179,7 +194,7 @@ static void epink_wait_busy_timeout( uint32_t timeout )
 {
     while( gpio_get( EPINK_BUSY_PIN ) ) {
         if( timeout-- == 0 ) {
-            printf( "epink_wait_busy timeout\n" );
+            EPINK_DEBUG( "epink_wait_busy timeout\n" );
             break;
         }
         else {
@@ -187,7 +202,7 @@ static void epink_wait_busy_timeout( uint32_t timeout )
         }
     }
     
-    printf( "epink_wait_busy_timeout ok\n" );
+    EPINK_DEBUG( "epink_wait_busy_timeout ok\n" );
 }
 
 static void epink_wait_busy()
@@ -196,7 +211,7 @@ static void epink_wait_busy()
     
     while( gpio_get( EPINK_BUSY_PIN ) ) {
         if( timeout-- == 0 ) {
-            printf( "epink_wait_busy timeout\n" );
+            EPINK_DEBUG( "epink_wait_busy timeout\n" );
             break;
         }
         else {
@@ -204,7 +219,7 @@ static void epink_wait_busy()
         }
     }
     
-    printf( "epink_wait_busy ok\n" );
+    EPINK_DEBUG( "epink_wait_busy ok\n" );
 }
 
 /* ========== epink operations ========== */
@@ -245,7 +260,7 @@ static void epink_turn_on_display()
     epink_wait_busy();
 }
 
-static void epink_init( uint8_t mode )
+static void epink_device_init( uint8_t mode )
 {
     epink_reset();
     
@@ -283,8 +298,14 @@ static void epink_init( uint8_t mode )
             epink_write_data( EPD_1IN54_lut_partial_update[i] );
         }
     else {
-        printf( "epink_init: unknown update mode\n" );
+        EPINK_DEBUG( "epink_init: unknown update mode\n" );
     }
+}
+
+static void epink_init( uint8_t mode )
+{
+    epink_device_init( mode );
+    memset( epink_disp_buffer, 0xFF, ARRAY_SIZE( epink_disp_buffer ) );
 }
 
 static void epink_clear( uint8_t color )
@@ -333,16 +354,24 @@ static void epink_flush()
     
     epink_set_window( 0, 0, EPINK_WIDTH, EPINK_HEIGHT );
     
-    for( uint16_t i = 0; i < height; i++ ) {
+    for( uint8_t i = 0; i < height; i++ ) {
         epink_set_cursor( 0, i );
         epink_write_command( 0x24 );
         
-        for( uint16_t j = 0; j < width; j++ ) {
-            epink_write_data( pen[i * j] );
+        /* flush each line in buffer */
+        for( uint8_t j = 0; j < width; j++ ) {
+            epink_write_data( pen[j + i * 25] );
         }
     }
     
-    // epink_turn_on_display();
+    epink_turn_on_display();
+}
+
+static void epink_buffer_clear()
+{
+    for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
+        epink_disp_buffer[i] = 0xFF;
+    }
 }
 
 static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
@@ -354,6 +383,14 @@ static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
     epink_write_data( color );
     
     epink_turn_on_display();
+    
+    /*                 Y
+     * Pixel like  X ******** ******** ... ******** 25
+     *               ******** ******** ... ********
+     *               ...
+     *               ******** ******** ... ********
+     *               200
+    */
 #endif
     uint8_t page, page_left;
     uint8_t *pen = epink_disp_buffer;
@@ -362,15 +399,23 @@ static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
     
     if( ( x >= 0 && x < EPINK_WIDTH ) && ( y >= 0 && y < EPINK_HEIGHT ) ) {
 #endif
-        page = y / 8;
-        page_left = y % 8 == 0 ? 0 : y % 8;
+        /* How to get the page in ram? */
+        /* 1. calc the x in which page of a line */
+        page = x / 8;
+        page_left = ( x % 8 == 0 ) ? 0 : x % 8;
+        EPINK_DEBUG( "page:%d, page_left:%d\n", page, page_left );
         
-        if( color ) {
-            pen[EPINK_DISP_BUFFER_OFFSET( page, x )] |= ( 1 << page_left );
+        /* 2. get which line by y */
+        if( color ) { /* set black bit to 0 */
+            pen[y * 25 + page] &= ~( 1 << ( 7 - page_left ) );
         }
         else {
-            pen[EPINK_DISP_BUFFER_OFFSET( page, x )] &= ~( 1 << page_left );
+            pen[y * 25 + page] |= ( 1 << ( 7 - page_left ) );
         }
+        
+        EPINK_DEBUG( "set:%d, clear:%d\n", ( uint8_t )~( 1 << page_left ),
+                     ( 1 << page_left ) );
+        EPINK_DEBUG( "which:%d, dump:%d\n", y * 25 + page, pen[y * 25 + page] );
         
 #ifdef EPINK_COORD_CHECK
     }
@@ -378,10 +423,35 @@ static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
 #endif
 }
 
-static void epink_putchar( uint8_t x, uint8_t y, char c )
+static void epink_putascii( uint8_t x, uint8_t y, char c )
 {
-    const unsigned char *index = fontdata_8x16[c - ' '];
+    const unsigned char *dots = ( uint8_t * )&fontdata_8x16[c * 16];
+    uint8_t *pen = epink_disp_buffer;
+    uint8_t row, col, byte;
+    
+    for( row = 0; row < 16; row++ ) {
+        byte = dots[row];
+        
+        for( col = 0; col < 8; col++ ) {
+            epink_draw_pixel( x + col, y + row, ( byte << col ) & 0x80 );
+        }
+    }
 }
+
+static void epink_putascii_string( uint8_t x, uint8_t y, char *str )
+{
+    while( *str != '\0' ) {
+        epink_putascii( x, y, *str++ );
+        x += 8;
+        
+        if( x >= EPINK_WIDTH ) {
+            x = 0;
+            y += 16; /* line hight min:16 */
+        }
+    }
+}
+
+
 
 int main( void )
 {
@@ -417,41 +487,64 @@ int main( void )
     gpio_set_dir( EPINK_BUSY_PIN, GPIO_IN );
     
     epink_init( EPINK_UPDATE_MODE_PART );
-    epink_clear( 0xFF );
-    
-    // uint8_t width, height;
-    // width = (100 % 8 == 0) ? (100 / 8) : (100 / 8 + 1);
-    // height = 100;
-    
-    // epink_set_window(0, 0, 100, 100);
-    
-    // for (uint16_t i = 0; i < height; i++)
-    // {
-    //         epink_set_cursor(0, i);
-    //         epink_write_command(0x24);
-    
-    //         for (uint16_t j = 0; j < width; j++)
-    //         {
-    //                 epink_write_data(0x00);
-    //         }
-    // }
-    //     __make_random_dram_data();
-    for( uint16_t x = 0; x < 50; x++ ) {
-        for( uint16_t y = 0; y < 50; y++ ) {
-            epink_draw_pixel( x, y, EPINK_COLOR_BLACK );
-        }
-    }
-    
-    epink_flush();
-    
+    epink_clear( 0x00 );
     epink_turn_on_display();
-    // epink_turn_on_display();
     
+    // sleep_ms(200);
     while( 1 ) {
-        // epink_clear(0xff);
-        // sleep_ms(500);
-        // epink_clear(0x00);
-        // sleep_ms(500);
+        // epink_clear(0xFF);
+        // epink_turn_on_display();
+        // sleep_ms(200);
+        // epink_buffer_clear();
+        // for( uint8_t x = 0, y = 0; x < 200; x++, y++ ) {
+        //     // EPINK_DEBUG("x:%d, y:%d\n", x, y);
+        //     // epink_draw_pixel( x-1, y-1, 1);
+        //     epink_draw_pixel( x, y, 1 );
+        //     epink_draw_pixel( x + 1, y, 1 );
+        //     epink_draw_pixel( x + 2, y, 1 );
+        //     epink_draw_pixel( x + 3, y, 1 );
+        // }
+    
+        // for( uint8_t x = 200, y = 0; x > 0; x--, y++ ) {
+        //     // EPINK_DEBUG("x:%d, y:%d\n", x, y);
+        //     // epink_draw_pixel( x-1, y-1, 1);
+        //     epink_draw_pixel( x, y, 1 );
+        //     epink_draw_pixel( x + 1, y, 1 );
+        //     epink_draw_pixel( x + 2, y, 1 );
+        //     epink_draw_pixel( x + 3, y, 1 );
+        // }
+        // epink_flush();
+        // sleep_ms( 200 );
+        // epink_putascii(50,50,'A');
+        // epink_buffer_clear();
+    
+        // for( int y = 0; y < 200; y += 16 ) {
+        //     epink_putascii_string( 0, y, "Hello, world!" );
+        // }
+    
+        // epink_flush();
+        // sleep_ms( 200 );
+    
+        // epink_buffer_clear();
+    
+        // for( int y = 0; y < 200; y += 16 ) {
+        //     epink_putascii_string( 50, y, "Hello, world!" );
+        // }
+    
+        // epink_flush();
+        // sleep_ms( 200 );
+    
+        // epink_buffer_clear();
+    
+        // for( int y = 0; y < 200; y += 16 ) {
+        //     epink_putascii_string( 100, y, "Hello, world!" );
+        // }
+    
+        // epink_flush();
+        // sleep_ms( 200 );
+        epink_putascii_string( 0, 0, TEST_DOC );
+        epink_flush();
+        sleep_ms( 500 );
     }
     
     return 0;
