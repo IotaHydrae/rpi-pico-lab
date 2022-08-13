@@ -2,8 +2,8 @@
  * @file main.c
  * @author IotaHydrae (writeforever@foxmail.com)
  * @brief file of the epink-1.54.
- * @version 0.1
- * @date 2022-08-07
+ * @version 0.2
+ * @date 2022-08-14
  *
  * Hi, guys!
  *
@@ -64,6 +64,8 @@
 /* ========== epink panel info ========== */
 #define EPINK_WIDTH 200
 #define EPINK_HEIGHT 200
+#define EPINK_PAGE_SIZE 8
+#define EPINK_LINE_WIDTH_IN_PAGE (EPINK_WIDTH/EPINK_PAGE_SIZE)
 #define EPINK_BPP 1
 #define EPINK_COLOR_WHITE (0xFF)
 #define EPINK_COLOR_BLACK (0x00)
