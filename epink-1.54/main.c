@@ -1,15 +1,15 @@
 /**
  * @file main.c
  * @author IotaHydrae (writeforever@foxmail.com)
- * @brief main file of the epink-1.54.
+ * @brief file of the epink-1.54.
  * @version 0.1
  * @date 2022-08-07
  *
  * Hi, guys!
  *
- * This is a simple driver for the epink-1.54.
+ * This is a simple ALL-IN-ONE driver for the LuatOS epink-1.54 screen module.
  *
- * This file is based on :
+ * the device init function in this file was based on :
  * https://gitee.com/openLuat/LuatOS/blob/master/components/epaper/EPD_1in54.c
  *
  * More info about the epaper module can be found in :
@@ -49,14 +49,13 @@
 #include "pico/binary_info.h"
 #include "hardware/spi.h"
 
-/*
- * pins define
+/* Pins Define of rpi-pico
  *
- * use default spi0
+ * The SPI interface using default spi0
  *
- * RES - GP14
- * DC  - GP15
- * BUSY - GP20
+ * RES  <->  GP14
+ * DC   <->  GP15
+ * BUSY <->  GP20
  */
 #define EPINK_RES_PIN 14
 #define EPINK_DC_PIN 15
@@ -190,6 +189,12 @@ static void epink_write_data( uint8_t data )
     epink_write_byte( data );
 }
 
+/**
+ * @brief Read the "busy" state pin to know if controller was busy,
+ * but gives a timeout
+ * 
+ * @param timeout 
+ */
 static void epink_wait_busy_timeout( uint32_t timeout )
 {
     while( gpio_get( EPINK_BUSY_PIN ) ) {
@@ -205,6 +210,10 @@ static void epink_wait_busy_timeout( uint32_t timeout )
     EPINK_DEBUG( "epink_wait_busy_timeout ok\n" );
 }
 
+/**
+ * @brief Read the "busy" state pin to know if controller was busy
+ * 
+ */
 static void epink_wait_busy()
 {
     uint32_t timeout = 100;
@@ -223,6 +232,14 @@ static void epink_wait_busy()
 }
 
 /* ========== epink operations ========== */
+/**
+ * @brief Set a limited drawing area of controller
+ * 
+ * @param x1 X start of area
+ * @param y1 Y start of area
+ * @param x2 X end of area
+ * @param y2 Y end of area
+ */
 static void epink_set_window( uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2 )
 {
     /* set start/end position address of x in ram */
@@ -238,6 +255,12 @@ static void epink_set_window( uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2 )
     epink_write_data( ( y2 >> 8 ) & 0xFF );
 }
 
+/**
+ * @brief Set the drawing position of controller
+ * 
+ * @param x 
+ * @param y 
+ */
 static void epink_set_cursor( uint8_t x, uint8_t y )
 {
     /* set address counter of x in ram */
@@ -250,6 +273,10 @@ static void epink_set_cursor( uint8_t x, uint8_t y )
     epink_write_data( ( y >> 8 ) & 0xFF );
 }
 
+/**
+ * @brief Turn on display, and sync the data in GDDRAM to screen
+ * 
+ */
 static void epink_turn_on_display()
 {
     epink_write_command( 0x22 ); // display update control 2
@@ -302,12 +329,23 @@ static void epink_device_init( uint8_t mode )
     }
 }
 
+/**
+ * @brief Real initialize function of epink, it
+ * initialize the controller and display buffer
+ * 
+ * @param mode update mode of epink panel
+ */
 static void epink_init( uint8_t mode )
 {
     epink_device_init( mode );
     memset( epink_disp_buffer, 0xFF, ARRAY_SIZE( epink_disp_buffer ) );
 }
 
+/**
+ * @brief Directly clear the GDDRAM in controller
+ * 
+ * @param color 0xFF means white, 0x00 means black
+ */
 static void epink_clear( uint8_t color )
 {
     uint8_t width, height;
@@ -326,17 +364,20 @@ static void epink_clear( uint8_t color )
         }
     }
     
-    // epink_turn_on_display();
+    epink_turn_on_display();
 }
 
+/**
+ * @brief Makes controller into sleep mode
+ * 
+ */
 static void epink_sleep()
 {
     epink_write_command( 0x10 );
     epink_write_data( 0x01 );
 }
 
-/* drawing functions */
-
+/* ========== epink drawing functions ========== */
 static void __make_random_dram_data()
 {
     for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
@@ -344,6 +385,10 @@ static void __make_random_dram_data()
     }
 }
 
+/**
+ * @brief Flush each byte in display buffer to screen
+ * 
+ */
 static void epink_flush()
 {
     uint8_t *pen = epink_disp_buffer;
@@ -367,6 +412,9 @@ static void epink_flush()
     epink_turn_on_display();
 }
 
+/**
+ * @brief Simply clear the display buffer to 0xFF 
+ */
 static void epink_buffer_clear()
 {
     for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
@@ -374,44 +422,69 @@ static void epink_buffer_clear()
     }
 }
 
+/**
+ * @brief draw a given position pixel to display buffer
+ * 
+ * @param x draw position of X
+ * @param y draw position os Y
+ * @param color 1 means black, 0 means white
+ */
 static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
 {
-#if 0
-    epink_set_window( 0, 0, EPINK_WIDTH, EPINK_HEIGHT );
-    epink_set_cursor( x, y );
-    epink_write_command( 0x24 );
-    epink_write_data( color );
-    
-    epink_turn_on_display();
-    
-    /*                 Y
-     * Pixel like  X ******** ******** ... ******** 25
-     *               ******** ******** ... ********
-     *               ...
-     *               ******** ******** ... ********
-     *               200
-    */
-#endif
+    /* If we want to do a given pixel draw, the best
+     * way might be draw it in a display buffer, because
+     * most display controller like this "epink", usually
+     * could enter a page write mode(check maunal of ssd1306),
+     * It's really makes a speed up and reduces the
+     * display buffer size we need to alloced.
+     *
+     * But the problems also goes on, In this mode, the eight
+     * bit was conbined to a byte and directly write to controller
+     * so we need to clac the given (x,y) in which page at display buffer
+     * and use "|=", "&=" to operate the page then flush it to screen.
+     *
+     * Actually, the flush operation can be executed when you already
+     * drawed all the pixel data to buffer
+     *
+     * The pages in display buffer looks like this :
+     *      Y
+     *    X ******** ******** ... ******** 25 page
+     *      ******** ******** ... ********
+     *         ...
+     *      ******** ******** ... ********
+     *      200 line
+     *
+     * So we did it like blow
+     */
     uint8_t page, page_left;
     uint8_t *pen = epink_disp_buffer;
-    /* do buffered draw pixel */
 #ifdef EPINK_COORD_CHECK
     
     if( ( x >= 0 && x < EPINK_WIDTH ) && ( y >= 0 && y < EPINK_HEIGHT ) ) {
 #endif
         /* How to get the page in ram? */
-        /* 1. calc the x in which page of a line */
+        /* 1. Calc the "X" in which page of line */
         page = x / 8;
+        /* The page_left is the bit we need to set to page, will use later */
         page_left = ( x % 8 == 0 ) ? 0 : x % 8;
         EPINK_DEBUG( "page:%d, page_left:%d\n", page, page_left );
         
-        /* 2. get which line by y */
-        if( color ) { /* set black bit to 0 */
+        /* 2. Get which line using "Y" */
+        /* The number 25 means a line contains 25 page,
+         * I should use a MARCO better, but in order to be
+         * more intuitive and if we use "Y * 25 + page",
+         * we can got the target page in display buffer,
+         * then we just set the offset bit to 0 means draw
+         * it into black.
+         *
+         * A little bit explanation of "1 << (7 - page_left)",
+         * when we draw a page to screen, the lowest bit of
+         * page corresponded the highest bit of byte in buffer.
+         */
+        if( color )
             pen[y * 25 + page] &= ~( 1 << ( 7 - page_left ) );
-        }
-        else {
+        else
             pen[y * 25 + page] |= ( 1 << ( 7 - page_left ) );
-        }
         
         EPINK_DEBUG( "set:%d, clear:%d\n", ( uint8_t )~( 1 << page_left ),
                      ( 1 << page_left ) );
@@ -423,12 +496,24 @@ static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
 #endif
 }
 
+/**
+ * @brief Put a single ascii char to panel
+ *
+ * @param x start position of X
+ * @param y start position of Y
+ * @param c char that will outputting to panel
+ */
 static void epink_putascii( uint8_t x, uint8_t y, char c )
 {
+    /* Get the char in ascii array, each char use 16 byte to store */
     const unsigned char *dots = ( uint8_t * )&fontdata_8x16[c * 16];
     uint8_t *pen = epink_disp_buffer;
     uint8_t row, col, byte;
     
+    /* In this case, we use 8x16 size font, so
+     * we need to draw 16 byte totally, for each
+     * byte, draw it's each bit from higher to low
+     */
     for( row = 0; row < 16; row++ ) {
         byte = dots[row];
         
@@ -438,20 +523,26 @@ static void epink_putascii( uint8_t x, uint8_t y, char c )
     }
 }
 
+/**
+ * @brief Put ascii string to panel
+ *
+ * @param x start position of X
+ * @param y start position of Y
+ * @param str string that will outputting to the panel
+ */
 static void epink_putascii_string( uint8_t x, uint8_t y, char *str )
 {
     while( *str != '\0' ) {
         epink_putascii( x, y, *str++ );
-        x += 8;
+        x += 8; /* move x to next pos */
         
+        /* start a new line if reach the end */
         if( x >= EPINK_WIDTH ) {
             x = 0;
             y += 16; /* line hight min:16 */
         }
     }
 }
-
-
 
 int main( void )
 {
@@ -473,9 +564,6 @@ int main( void )
     gpio_set_dir( PICO_DEFAULT_SPI_CSN_PIN, GPIO_OUT );
     gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 1 );
     bi_decl( bi_1pin_with_name( PICO_DEFAULT_SPI_CSN_PIN, "SPI CS" ) );
-    
-    // gpio_init( EPINK_RES_PIN | EPINK_DC_PIN | EPINK_BUSY_PIN );
-    // gpio_set_dir( EPINK_RES_PIN | EPINK_DC_PIN | EPINK_BUSY_PIN, GPIO_OUT );
     
     gpio_init( EPINK_RES_PIN );
     gpio_set_dir( EPINK_RES_PIN, GPIO_OUT );
