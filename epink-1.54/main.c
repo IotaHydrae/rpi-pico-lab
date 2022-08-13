@@ -487,7 +487,7 @@ int main( void )
     gpio_set_dir( EPINK_BUSY_PIN, GPIO_IN );
     
     epink_init( EPINK_UPDATE_MODE_PART );
-    epink_clear( 0x00 );
+    epink_clear( 0xFF );
     epink_turn_on_display();
     
     // sleep_ms(200);
