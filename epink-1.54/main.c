@@ -57,14 +57,14 @@
  * DC   <->  GP15
  * BUSY <->  GP20
  */
-#define EPINK_RES_PIN 14
-#define EPINK_DC_PIN 15
-#define EPINK_BUSY_PIN 20
+#define EPINK_RES_PIN   14
+#define EPINK_DC_PIN    15
+#define EPINK_BUSY_PIN  20
 
 /* ========== epink panel info ========== */
-#define EPINK_WIDTH 200
-#define EPINK_HEIGHT 200
-#define EPINK_PAGE_SIZE 8
+#define EPINK_WIDTH         200
+#define EPINK_HEIGHT        200
+#define EPINK_PAGE_SIZE     8
 #define EPINK_LINE_WIDTH_IN_PAGE (EPINK_WIDTH/EPINK_PAGE_SIZE)
 #define EPINK_BPP 1
 #define EPINK_COLOR_WHITE (0xFF)
@@ -440,8 +440,8 @@ static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
      * It's really makes a speed up and reduces the
      * display buffer size we need to alloced.
      *
-     * But the problems also goes on, In this mode, the eight
-     * bit was conbined to a byte and directly write to controller
+     * But the problems also goes on, In this mode, the eight pixel
+     * bit data was conbined to a byte and write to controller directly
      * so we need to clac the given (x,y) in which page at display buffer
      * and use "|=", "&=" to operate the page then flush it to screen.
      *
