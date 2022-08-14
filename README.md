@@ -6,8 +6,18 @@ This is a lab workspace for rpi `RP2040` mcu and based on `rpi-pico`, also conta
 
 Cheers,
 
+Clone this repo
+---------------
+```shell
+$ git clone https://github.com/IotaHydrae/rpi-pico-lab.git
+
+$ git submodule update --init
+```
+
+
 Install OpenOCD
 ---------------
+In this case, we use a `CMSIS-DAPLINK` debugger, if you use a st-link or whatever, just enable it.
 ```shell
 # install pre req
 $ sudo apt install automake autoconf build-essential texinfo libtool libftdi-dev libusb-1.0-0-dev libhidapi-dev -y
@@ -21,6 +31,8 @@ $ sudo make install
 
 Source ENV
 ----------
+The load and reset script only comptible with CMSIS-DAPLINK, so if you choose anthoer
+debugger, change the debugger type in script.
 ```shell
 $ source tools/envsetup.sh
 ```
