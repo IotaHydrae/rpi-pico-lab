@@ -448,14 +448,14 @@ static void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color )
      * Actually, the flush operation can be executed when you already
      * drawed all the pixel data to buffer
      *
-     * The pages in display buffer looks like this :
+     * These pages in display buffer looks like this :
      *      Y
      *    X ******** ******** ... ******** 25 page
      *      ******** ******** ... ********
      *         ...
      *      ******** ******** ... ********
      *      200 line
-     *
+     *                                  5000 bytes 
      * So we did it like blow
      */
     uint8_t page, page_left;
@@ -512,7 +512,7 @@ static void epink_putascii( uint8_t x, uint8_t y, char c )
     uint8_t *pen = epink_disp_buffer;
     uint8_t row, col, byte;
     
-    /* In this case, we use 8x16 size font, so
+    /* In this case, we use a 8x16 size font, so
      * we need to draw 16 byte totally, for each
      * byte, draw it's each bit from higher to low
      */
@@ -536,9 +536,9 @@ static void epink_putascii_string( uint8_t x, uint8_t y, char *str )
 {
     while( *str != '\0' ) {
         epink_putascii( x, y, *str++ );
-        x += 8; /* move x to next pos */
+        x += 8; /* move x to the next pos */
         
-        /* start a new line if reach the end */
+        /* start a new line if reach the end of line */
         if( x >= EPINK_WIDTH ) {
             x = 0;
             y += 16; /* line hight min:16 */
