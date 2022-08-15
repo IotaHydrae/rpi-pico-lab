@@ -93,6 +93,11 @@ API might be different, too. However, at least the ALSA kernel \
 API is consistent, and therefore it would be still a bit help \
 for writing them."
 
+#define TEST_DOC2 "This variable provides a means of enabling or \
+disabling features of a recipe on a per-recipe basis. PACKAGECONFIG \
+blocks are defined in recipes when you specify features and then \
+arguments that define feature behaviors."
+
 static const unsigned char EPD_1IN54_lut_full_update[] = {
     0x02, 0x02, 0x01, 0x11, 0x12, 0x12, 0x22, 0x22,
     0x66, 0x69, 0x69, 0x59, 0x58, 0x99, 0x99, 0x88,
@@ -577,9 +582,15 @@ int main( void )
     gpio_set_dir( EPINK_BUSY_PIN, GPIO_IN );
     
     epink_init( EPINK_UPDATE_MODE_PART );
+
+    epink_clear( 0x00 );
+    epink_turn_on_display();
+    sleep_ms(500);
+    
     epink_clear( 0xFF );
     epink_turn_on_display();
-    
+    sleep_ms(500);
+
     // sleep_ms(200);
     while( 1 ) {
         // epink_clear(0xFF);
@@ -632,7 +643,7 @@ int main( void )
     
         // epink_flush();
         // sleep_ms( 200 );
-        epink_putascii_string( 0, 0, TEST_DOC );
+        epink_putascii_string( 0, 0, TEST_DOC2 );
         epink_flush();
         sleep_ms( 500 );
     }
