@@ -118,6 +118,10 @@ struct epink_operations {
     void (*init)(uint8_t mode);
 
     void (*reset)(void);
+
+    void (*draw_pixel)(uint16_t x, uint16_t y, uint32_t color);
+    void (*clear)(void);
+    void (*flush)(void);
 };
 
 struct epink_device {
@@ -126,12 +130,16 @@ struct epink_device {
 
     struct epink_config *cfg;
     struct epink_operations *opr;
+
+    struct epink_device *p_next;
 };
 
-struct epink_data {
+struct epink_handler {
     uint8_t *name;
     struct epink_device *dev;
     struct epink_driver *drv;
+
+    struct epink_handler *p_next;
 };
 
 /* Global functions */
@@ -163,6 +171,10 @@ struct epink_data {
 
 int register_device(struct epink_device *dev);
 int register_driver(struct native_driver *drv);
+
+/* TODO: this unregister opereation is also needed */
+int unregister_device(struct epink_device *dev);
+int unregister_driver(struct native_driver *drv);
 
 
 void epink_disp_port_init(void);

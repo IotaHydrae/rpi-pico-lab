@@ -120,14 +120,13 @@ static void epink_device_init( uint8_t mode )
 }
 
 /**
- * @brief Real initialize function of epink, it
- * initialize the controller and display buffer
+ * @brief really initialize function of epink, it
+ * initialize the controller, display buffer etc.
  * 
- * @param mode update mode of epink panel
  */
-static void epink_init( uint8_t mode )
+static void epink_init( struct epink_handler *handler )
 {
-    epink_device_init( mode );
+    epink_device_init( handler->dev->cfg->update_mode );
     memset( epink_disp_buffer, 0xFF, ARRAY_SIZE( epink_disp_buffer ) );
 }
 
