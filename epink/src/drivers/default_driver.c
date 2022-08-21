@@ -152,7 +152,7 @@ static void native_hal_init(struct native_config *cfg)
 
 }
 
-static struct native_config default_config = {
+static struct native_config config_default = {
     .pin_res    = 14,
     .pin_dc     = 15,
     .pin_cs     = 17,
@@ -160,7 +160,7 @@ static struct native_config default_config = {
     .spi_speed  = 50000000, /* 50MHz */
 };
 
-static struct native_interface default_interface = {
+static struct native_interface iface_default = {
     .hal_init    = native_hal_init,
     .cs_select   = native_cs_select,
     .cs_deselect = native_cs_deselect,

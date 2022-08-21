@@ -45,6 +45,7 @@
 #ifndef __PORT_H
 #define __PORT_H
 
+#include <stdint.h>
 #include "epink.h"
 
 struct native_config {
@@ -81,6 +82,8 @@ struct native_interface {
 struct native_driver {
     uint8_t id;
     uint8_t *name;
+    uint8_t matched;
+
     struct native_config *config;
     struct native_interface *iface;
 

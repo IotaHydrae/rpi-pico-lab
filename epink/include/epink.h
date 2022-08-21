@@ -121,29 +121,48 @@ struct epink_operations {
 };
 
 struct epink_device {
+    uint8_t *name;
+    uint8_t matched;
+
     struct epink_config *cfg;
     struct epink_operations *opr;
 };
 
 struct epink_data {
+    uint8_t *name;
     struct epink_device *dev;
     struct epink_driver *drv;
 };
 
 /* Global functions */
 /* Marcos */
+#define register_platform_device(dev) \
+    static struct epink_device dev##_platform_device = { \
+        .name = #dev, \
+        .cfg = &config_##dev, \
+        .opr = &opr_##dev, \
+    }; \
+    static void __attribute__((constructor)) dev##_platform_device_register(void) \
+    { \
+        printf("%s\n", __func__); \
+        register_device(&dev##_platform_device); \
+    }
+
+
 #define register_platform_driver(drv) \
     static struct native_driver drv##_platform_driver = { \
         .name   = #drv, \
-        .config = &drv##_config, \
-        .iface  = &drv##_interface, \
+        .config = &config_##drv, \
+        .iface  = &iface_##drv, \
     }; \
     static void __attribute__((constructor)) drv##_platform_driver_register(void) \
     { \
+        printf("%s\n", __func__); \
         register_driver(&drv##_platform_driver); \
     }
 
-void register_driver(struct native_driver *drv);
+int register_device(struct epink_device *dev);
+int register_driver(struct native_driver *drv);
 
 
 void epink_disp_port_init(void);
