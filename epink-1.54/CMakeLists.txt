@@ -10,13 +10,16 @@ project(epink)
 pico_sdk_init()
 
 # add include and src files
-file(GLOB_RECURSE INCLUDES "include/*.h")
+file(GLOB_RECURSE INCLUDES "./*.h" "include/*.h")
 file(GLOB_RECURSE SOURCES "src/*.c")
 
-# rest of your project
-add_executable(epink main.c ${INCLUDES} ${SOURCES})
+# include_directories(include)
 
-target_include_directories(epink PUBLIC .)
+# rest of your project
+# add_executable(epink main.c ${INCLUDES} src/font_8x16.c)
+add_executable(epink main.c ${SOURCES} ${INCLUDES})
+
+# target_include_directories(epink PRIVATE include)
 target_link_libraries(epink pico_stdlib hardware_spi)
 
 pico_enable_stdio_usb(epink 0)

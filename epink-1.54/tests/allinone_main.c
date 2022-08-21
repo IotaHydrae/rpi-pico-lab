@@ -1,5 +1,5 @@
 /**
- * @file epink.c
+ * @file main.c
  * @author IotaHydrae (writeforever@foxmail.com)
  * @brief file of the epink-1.54.
  * @version 0.2
@@ -41,10 +41,62 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  *
  */
+
 #include <stdio.h>
-#include <errno.h>
+#include <string.h>
+
 #include "pico/stdlib.h"
-#include "epink.h"
+#include "pico/binary_info.h"
+#include "hardware/spi.h"
+
+/* Pins Define of rpi-pico
+ *
+ * The SPI interface using default spi0
+ *
+ * RES  <->  GP14
+ * DC   <->  GP15
+ * BUSY <->  GP20
+ */
+#define EPINK_RES_PIN   14
+#define EPINK_DC_PIN    15
+#define EPINK_BUSY_PIN  20
+
+/* ========== epink panel info ========== */
+#define EPINK_WIDTH         200
+#define EPINK_HEIGHT        200
+#define EPINK_PAGE_SIZE     8
+#define EPINK_LINE_WIDTH_IN_PAGE (EPINK_WIDTH/EPINK_PAGE_SIZE)
+#define EPINK_BPP 1
+#define EPINK_COLOR_WHITE (0xFF)
+#define EPINK_COLOR_BLACK (0x00)
+
+#define EPINK_UPDATE_MODE_FULL 1
+#define EPINK_UPDATE_MODE_PART 2
+
+#define EPINK_DISP_BUFFER_SIZE (EPINK_WIDTH*EPINK_HEIGHT/8)
+#define EPINK_DISP_BUFFER_OFFSET(p,x)(p*EPINK_WIDTH + x)
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
+// #define EPINK_DEBUG_MODE
+#define EPINK_COORD_CHECK
+#ifdef EPINK_DEBUG_MODE
+    #define EPINK_DEBUG(...) printf(__VA_ARGS__)
+#else
+    #define EPINK_DEBUG
+#endif
+
+#define TEST_DOC "This document describes how to write an ALSA \
+(Advanced Linux Sound Architecture) driver. The document focuses \
+mainly on PCI soundcards. In the case of other device types, the \
+API might be different, too. However, at least the ALSA kernel \
+API is consistent, and therefore it would be still a bit help \
+for writing them."
+
+#define TEST_DOC2 "This variable provides a means of enabling or \
+disabling features of a recipe on a per-recipe basis. PACKAGECONFIG \
+blocks are defined in recipes when you specify features and then \
+arguments that define feature behaviors."
 
 static const unsigned char EPD_1IN54_lut_full_update[] = {
     0x02, 0x02, 0x01, 0x11, 0x12, 0x12, 0x22, 0x22,
@@ -65,9 +117,126 @@ static uint8_t epink_disp_buffer[EPINK_DISP_BUFFER_SIZE];
 extern unsigned char fontdata_mini_4x6[1536];
 extern unsigned char fontdata_8x16[4096];
 
-/* For driver register */
-static struct native_driver *g_pt_native_driver = NULL; /* must allways point to the first node */
-static uint32_t g_driver_id = 0;
+/* ========== epink pin controls ========== */
+#ifdef PICO_DEFAULT_SPI_CSN_PIN
+static inline void cs_select()
+{
+    asm volatile( "nop \n nop \n nop" );
+    gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 0 ); // Active low
+    asm volatile( "nop \n nop \n nop" );
+}
+
+static inline void cs_deselect()
+{
+    asm volatile( "nop \n nop \n nop" );
+    gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 1 );
+    asm volatile( "nop \n nop \n nop" );
+}
+#endif
+
+static inline void epink_dc_set()
+{
+    asm volatile( "nop \n nop \n nop" );
+    gpio_put( EPINK_DC_PIN, 1 );
+    asm volatile( "nop \n nop \n nop" );
+}
+
+static inline void epink_dc_clr()
+{
+    asm volatile( "nop \n nop \n nop" );
+    gpio_put( EPINK_DC_PIN, 0 );
+    asm volatile( "nop \n nop \n nop" );
+}
+
+static inline void epink_res_set()
+{
+    asm volatile( "nop \n nop \n nop" );
+    gpio_put( EPINK_RES_PIN, 1 );
+    asm volatile( "nop \n nop \n nop" );
+}
+
+static inline void epink_res_clr()
+{
+    asm volatile( "nop \n nop \n nop" );
+    gpio_put( EPINK_RES_PIN, 0 );
+    asm volatile( "nop \n nop \n nop" );
+}
+
+static void epink_reset()
+{
+    epink_res_set();
+    sleep_ms( 200 );
+    
+    epink_res_clr();
+    sleep_ms( 2 );
+    
+    epink_res_set();
+    sleep_ms( 200 );
+}
+
+/* ========== epink I/O ========== */
+
+static inline void epink_write_byte( uint8_t val )
+{
+    uint8_t buf[1] = {val};
+    cs_select();
+    spi_write_blocking( spi_default, buf, 1 );
+    cs_deselect();
+}
+
+static void epink_write_command( uint8_t command )
+{
+    epink_dc_clr();
+    epink_write_byte( command );
+}
+
+static void epink_write_data( uint8_t data )
+{
+    epink_dc_set();
+    epink_write_byte( data );
+}
+
+/**
+ * @brief Read the "busy" state pin to know if controller was busy,
+ * but gives a timeout
+ * 
+ * @param timeout 
+ */
+static void epink_wait_busy_timeout( uint32_t timeout )
+{
+    while( gpio_get( EPINK_BUSY_PIN ) ) {
+        if( timeout-- == 0 ) {
+            EPINK_DEBUG( "epink_wait_busy timeout\n" );
+            break;
+        }
+        else {
+            sleep_ms( 100 );
+        }
+    }
+    
+    EPINK_DEBUG( "epink_wait_busy_timeout ok\n" );
+}
+
+/**
+ * @brief Read the "busy" state pin to know if controller was busy
+ * 
+ */
+static void epink_wait_busy()
+{
+    uint32_t timeout = 100;
+    
+    while( gpio_get( EPINK_BUSY_PIN ) ) {
+        if( timeout-- == 0 ) {
+            EPINK_DEBUG( "epink_wait_busy timeout\n" );
+            break;
+        }
+        else {
+            sleep_ms( 100 );
+        }
+    }
+    
+    EPINK_DEBUG( "epink_wait_busy ok\n" );
+}
 
 /* ========== epink operations ========== */
 /**
@@ -382,29 +551,112 @@ static void epink_putascii_string( uint8_t x, uint8_t y, char *str )
     }
 }
 
-void register_driver(struct native_driver *drv)
+/**
+ * @brief hardware layer initialize 
+ * for each platform, do it's iomux and pinctl here
+ */
+static void hal_init(void)
 {
-    struct native_driver *p_tmp;
+    stdio_init_all();
 
-    /* Check if driver pointer is legal */
-    if (!drv) {
-        fprintf(stderr, "[ERROR] invaild driver node");
-        return -EINVAL;
+#if !defined(spi_default) || !defined(PICO_DEFAULT_SPI_SCK_PIN) || !defined(PICO_DEFAULT_SPI_TX_PIN) || !defined(PICO_DEFAULT_SPI_RX_PIN) || !defined(PICO_DEFAULT_SPI_CSN_PIN)
+#warning spi/bme280_spi example requires a board with SPI pins
+    puts( "Default SPI pins were not defined" );
+#else
+    
+    /* Useing default SPI0 at 50MHz */
+    spi_init( spi_default, 50 * 1000 * 1000 );
+    gpio_set_function( PICO_DEFAULT_SPI_SCK_PIN, GPIO_FUNC_SPI );
+    gpio_set_function( PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI );
+    bi_decl( bi_2pins_with_func( PICO_DEFAULT_SPI_TX_PIN, PICO_DEFAULT_SPI_SCK_PIN,
+                                 GPIO_FUNC_SPI ) );
+    
+    gpio_init( PICO_DEFAULT_SPI_CSN_PIN );
+    gpio_set_dir( PICO_DEFAULT_SPI_CSN_PIN, GPIO_OUT );
+    gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 1 );
+    bi_decl( bi_1pin_with_name( PICO_DEFAULT_SPI_CSN_PIN, "SPI CS" ) );
+    
+    gpio_init( EPINK_RES_PIN );
+    gpio_set_dir( EPINK_RES_PIN, GPIO_OUT );
+    
+    gpio_init( EPINK_DC_PIN );
+    gpio_set_dir( EPINK_DC_PIN, GPIO_OUT );
+    
+    gpio_init( EPINK_BUSY_PIN );
+    gpio_set_dir( EPINK_BUSY_PIN, GPIO_IN );
+}
+
+int main( void )
+{
+    hal_init();
+
+    epink_init( EPINK_UPDATE_MODE_PART );
+
+    /*  a global clear before drawing operations  */
+    epink_clear( 0x00 );
+    sleep_ms(500);
+    epink_clear( 0xFF );
+    sleep_ms(500);
+
+    // sleep_ms(200);
+    while( 1 ) {
+        // epink_clear(0xFF);
+        // epink_turn_on_display();
+        // sleep_ms(200);
+        // epink_buffer_clear();
+        for( uint8_t x = 0, y = 0; x < 200; x++, y++ ) {
+            // EPINK_DEBUG("x:%d, y:%d\n", x, y);
+            // epink_draw_pixel( x-1, y-1, 1);
+            epink_draw_pixel( x, y, 1 );
+            epink_draw_pixel( x + 1, y, 1 );
+            epink_draw_pixel( x + 2, y, 1 );
+            epink_draw_pixel( x + 3, y, 1 );
+            epink_draw_pixel( x + 4, y, 1 );
+        }
+    
+        for( uint8_t x = 200, y = 0; x > 0; x--, y++ ) {
+            // EPINK_DEBUG("x:%d, y:%d\n", x, y);
+            // epink_draw_pixel( x-1, y-1, 1);
+            epink_draw_pixel( x, y, 1 );
+            epink_draw_pixel( x + 1, y, 1 );
+            epink_draw_pixel( x + 2, y, 1 );
+            epink_draw_pixel( x + 3, y, 1 );
+            epink_draw_pixel( x + 4, y, 1 );
+        }
+        epink_flush();
+        // sleep_ms( 200 );
+        // epink_putascii(50,50,'A');
+        // epink_buffer_clear();
+    
+        // for( int y = 0; y < 200; y += 16 ) {
+        //     epink_putascii_string( 0, y, "Hello, world!" );
+        // }
+    
+        // epink_flush();
+        // sleep_ms( 200 );
+    
+        // epink_buffer_clear();
+    
+        // for( int y = 0; y < 200; y += 16 ) {
+        //     epink_putascii_string( 50, y, "Hello, world!" );
+        // }
+    
+        // epink_flush();
+        // sleep_ms( 200 );
+    
+        // epink_buffer_clear();
+    
+        // for( int y = 0; y < 200; y += 16 ) {
+        //     epink_putascii_string( 100, y, "Hello, world!" );
+        // }
+    
+        // epink_flush();
+        // sleep_ms( 200 );
+        epink_putascii_string( 0, 0, TEST_DOC );
+        epink_flush();
+        sleep_ms( 500 );
     }
-
-    /* Oh, this is the first node of driver chain */
-    if (!g_pt_native_driver) 
-        g_pt_native_driver = drv;
-    /* YEEE, we got more than one driver registered in */
-    else {
-        p_tmp = g_pt_native_driver;
-
-        while(p_tmp->p_next)
-            p_tmp = p_tmp->p_next;
-
-        p_tmp->p_next = drv;    /* registered */
-    }
-
-    drv->id = g_driver_id++;
-    drv->p_next = NULL;
+    
+    return 0;
+#endif
 }

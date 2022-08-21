@@ -43,7 +43,9 @@
  */
 
 #ifndef __EPINK_H
-#define __EPIKN_H
+#define __EPINK_H
+
+#include "port.h"
 
 /* Pins Define of rpi-pico
  *
@@ -63,14 +65,11 @@
 #define EPINK_PAGE_SIZE     8
 #define EPINK_LINE_WIDTH_IN_PAGE (EPINK_WIDTH/EPINK_PAGE_SIZE)
 #define EPINK_BPP 1
-#define EPINK_COLOR_WHITE (0xFF)
-#define EPINK_COLOR_BLACK (0x00)
-
-#define EPINK_UPDATE_MODE_FULL 1
-#define EPINK_UPDATE_MODE_PART 2
+#define EPINK_COLOR_WHITE 0xFF
+#define EPINK_COLOR_BLACK 0x00
 
 #define EPINK_DISP_BUFFER_SIZE (EPINK_WIDTH*EPINK_HEIGHT/8)
-#define EPINK_DISP_BUFFER_OFFSET(p,x)(p*EPINK_WIDTH + x)
+#define EPINK_DISP_BUFFER_OFFSET(p,x)(p*EPINK_WIDTH+x)
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -96,7 +95,7 @@ arguments that define feature behaviors."
 
 typedef enum {
     EPINK_UPDATE_MODE_FULL = 0x00,
-    EPINK_UPDATE_MODE_FULL = 0x01,
+    EPINK_UPDATE_MODE_PART = 0x01,
 }epink_update_mode_t;
 
 typedef enum {
@@ -105,47 +104,48 @@ typedef enum {
 }epink_font_t;
 
 struct epink_config {
-    /* hardware */
-    uint8_t epink_pin_cs;
-    uint8_t epink_pin_dc;
-    uint8_t epink_pin_res;
-    uint8_t epink_update_mode;
-    uint32_t epink_spi_speed;
+    /* panel config */
+    uint16_t width;
+    uint16_t height;
+    uint8_t bpp; 
 
-    /* software */
-};
-
-struct epink_driver {
-    void (*hal_init)(void);
-
-    void (*cs_select)(void);
-    void (*cs_deselect)(void);
-
-    void (*dc_set)(void);
-    void (*dc_clr)(void);
-    
-    void (*res_set)(void);
-    void (*res_clr)(void);
-
-    void (*write_byte)(uint8_t byte);
-    
-    void (*write_command)(uint8_t command);
-    void (*write_data)(uint8_t data);
-    void (*wait_busy)(void);
+    uint8_t update_mode;
+    uint8_t font;
 };
 
 struct epink_operations {
     void (*device_init)(uint8_t mode);
     void (*init)(uint8_t mode);
+
+    void (*reset)(void);
+};
+
+struct epink_device {
+    struct epink_config *cfg;
+    struct epink_operations *opr;
 };
 
 struct epink_data {
-    struct epink_config config;
-    struct epink_driver drv;
-    struct epink_operations opr;
+    struct epink_device *dev;
+    struct epink_driver *drv;
 };
 
 /* Global functions */
-void register_epink_driver(struct epink_driver *drv);
+/* Marcos */
+#define register_platform_driver(drv) \
+    static struct native_driver drv##_platform_driver = { \
+        .name   = #drv, \
+        .config = &drv##_config, \
+        .iface  = &drv##_interface, \
+    }; \
+    static void __attribute__((constructor)) drv##_platform_driver_register(void) \
+    { \
+        register_driver(&drv##_platform_driver); \
+    }
 
-#endif
+void register_driver(struct native_driver *drv);
+
+
+void epink_disp_port_init(void);
+
+#endif  /* __EPINK_H */
