@@ -1,0 +1,595 @@
+/**
+ * @file lv_port_disp_linux.c
+ *
+ */
+
+/*Copy this file as "lv_port_disp.c" and set this value to "1" to enable content*/
+#if 1
+
+/*********************
+ *      INCLUDES
+ *********************/
+
+#include <stdio.h>
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <malloc.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <asm/types.h>
+#include <dlfcn.h>
+#include <linux/fb.h>
+#include <pthread.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <vio/hb_vot.h>
+//#include "iar_interface.h"
+#include <vio/hb_vio_interface.h>
+
+#include "lv_port_disp_vot.h"
+#include "../lvgl/lvgl.h"
+
+/*********************
+ *      DEFINES
+ *********************/
+
+/**********************
+ *      TYPEDEFS
+ **********************/
+#if 0
+union rgb888 {
+    uint8_t data[0];
+    struct {
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
+    } channel;
+};
+#endif
+
+/**********************
+ *  STATIC PROTOTYPES
+ **********************/
+static void disp_init( void );
+static void disp_exit( void );
+static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
+                        lv_color_t *color_p );
+//static void gpu_fill(lv_disp_drv_t * disp_drv, lv_color_t * dest_buf, lv_coord_t dest_width,
+//        const lv_area_t * fill_area, lv_color_t color);
+static inline unsigned char clip_value( unsigned char x, unsigned char min_val,
+                                        unsigned char max_val );
+
+#if 0
+static void rgb2yuv420p( int w, int h, unsigned char *RgbBuf,
+                         unsigned char *yuvBuf );
+#endif
+
+static inline void rgb2nv12( int w, int h, unsigned char *RgbBuf,
+                             unsigned char *yuvBuf );
+
+static inline void bgra2nv12( int w, int h, unsigned char *RgbBuf,
+                              unsigned char *yuvBuf );
+
+static inline void rotate_yuv420sp( uint8_t *src, uint8_t *dst, int width,
+                                    int height );
+
+/**********************
+ *  STATIC VARIABLES
+ **********************/
+static uint8_t *g_dump_buffer;
+static uint8_t *g_yuv_buffer;
+static uint8_t *g_rotated_yuv_buffer;
+
+/**********************
+ *      MACROS
+ **********************/
+
+/**********************
+ *   GLOBAL FUNCTIONS
+ **********************/
+
+void lv_port_disp_init( void )
+{
+    /*-------------------------
+     * Initialize your display
+     * -----------------------*/
+    disp_init();
+    
+    /*-----------------------------
+     * Create a buffer for drawing
+     *----------------------------*/
+    
+    /**
+     * LVGL requires a buffer where it internally draws the widgets.
+     * Later this buffer will passed to your display driver's `flush_cb` to copy its content to your display.
+     * The buffer has to be greater than 1 display row
+     *
+     * There are 3 buffering configurations:
+     * 1. Create ONE buffer:
+     *      LVGL will draw the display's content here and writes it to your display
+     *
+     * 2. Create TWO buffer:
+     *      LVGL will draw the display's content to a buffer and writes it your display.
+     *      You should use DMA to write the buffer's content to the display.
+     *      It will enable LVGL to draw the next part of the screen to the other buffer while
+     *      the data is being sent form the first buffer. It makes rendering and flushing parallel.
+     *
+     * 3. Double buffering
+     *      Set 2 screens sized buffers and set disp_drv.full_refresh = 1.
+     *      This way LVGL will always provide the whole rendered screen in `flush_cb`
+     *      and you only need to change the frame buffer's address.
+     */
+    
+    /* Example for 1) */
+    //static lv_disp_draw_buf_t draw_buf_dsc_1;
+    //static lv_color_t buf_1[MY_DISP_HOR_RES * 10];                          /*A buffer for 10 rows*/
+    //lv_disp_draw_buf_init(&draw_buf_dsc_1, buf_1, NULL, MY_DISP_HOR_RES * 10);   /*Initialize the display buffer*/
+    
+    /* Example for 2) */
+    // static lv_disp_draw_buf_t draw_buf_dsc_2;
+    // static lv_color_t buf_2_1[MY_DISP_HOR_RES * 10];                        /*A buffer for 10 rows*/
+    // static lv_color_t buf_2_2[MY_DISP_HOR_RES * 10];                        /*An other buffer for 10 rows*/
+    // lv_disp_draw_buf_init(&draw_buf_dsc_2, buf_2_1, buf_2_2, MY_DISP_HOR_RES * 10);   /*Initialize the display buffer*/
+    
+    /* Example for 3) also set disp_drv.full_refresh = 1 below*/
+    static lv_disp_draw_buf_t draw_buf_dsc_3;
+    static lv_color_t buf_3_1[MY_DISP_HOR_RES *
+                                              MY_DISP_VER_RES];            /*A screen sized buffer*/
+    static lv_color_t buf_3_2[MY_DISP_HOR_RES *
+                                              MY_DISP_VER_RES];            /*Another screen sized buffer*/
+    lv_disp_draw_buf_init( &draw_buf_dsc_3, buf_3_1, buf_3_2,
+                           MY_DISP_HOR_RES * MY_DISP_VER_RES );  /*Initialize the display buffer*/
+                           
+    /*-----------------------------------
+     * Register the display in LVGL
+     *----------------------------------*/
+    
+    static lv_disp_drv_t
+    disp_drv;                         /*Descriptor of a display driver*/
+    lv_disp_drv_init( &disp_drv );                  /*Basic initialization*/
+    
+    /*Set up the functions to access to your display*/
+    
+    /*Set the resolution of the display*/
+    disp_drv.hor_res = MY_DISP_HOR_RES;
+    disp_drv.ver_res = MY_DISP_VER_RES;
+    
+    /*Used to copy the buffer's content to the display*/
+    disp_drv.flush_cb = disp_flush;
+    
+    /*Set a display buffer*/
+    disp_drv.draw_buf = &draw_buf_dsc_3;
+    
+    /*Required for Example 3)*/
+    disp_drv.full_refresh = 1;
+    
+    /* Fill a memory array with a color if you have GPU.
+     * Note that, in lv_conf.h you can enable GPUs that has built-in support in LVGL.
+     * But if you have a different GPU you can use with this callback.*/
+    //disp_drv.gpu_fill_cb = gpu_fill;
+    
+    /*Finally register the driver*/
+    lv_disp_drv_register( &disp_drv );
+}
+
+/**********************
+ *   STATIC FUNCTIONS
+ **********************/
+
+/*Initialize your display and the required peripherals.*/
+static void disp_init( void )
+{
+    /*You code here*/
+    // char *framebuf[4];
+    // int framesize[4];
+    VOT_VIDEO_LAYER_ATTR_S stLayerAttr;
+    VOT_CHN_ATTR_S stChnAttr;
+    // VOT_WB_ATTR_S stWbAttr;
+    VOT_CROP_INFO_S cropAttrs;
+    // hb_vio_buffer_t iar_buf = {0};
+    // hb_vio_buffer_t iar_buf1 = {0};
+    VOT_PUB_ATTR_S devAttr;
+    // POINT_S display_point = {0};
+    int ret = 0;
+    // int i = 0;
+    
+    devAttr.enIntfSync = VO_OUTPUT_USER;
+    devAttr.u32BgColor = 0x108080;
+    devAttr.enOutputMode = HB_VOT_OUTPUT_MIPI;
+    devAttr.stSyncInfo.pixel_clk = 15000000;
+    devAttr.stSyncInfo.hbp = 220;
+    devAttr.stSyncInfo.hfp = 220;
+    devAttr.stSyncInfo.hs = 60;
+    devAttr.stSyncInfo.vbp = 10;
+    devAttr.stSyncInfo.vfp = 30;
+    devAttr.stSyncInfo.vs = 5;
+    devAttr.stSyncInfo.width = 240;//240
+    devAttr.stSyncInfo.height = 320;
+    
+    ret = HB_VOT_SetPubAttr( 0, &devAttr );
+    
+    if( ret ) {
+        printf( "HB_VOT_SetPubAttr failed\n" );
+    }
+    
+    ret = HB_VOT_Enable( 0 );
+    
+    if( ret ) {
+        printf( "HB_VOT_Enable failed.\n" );
+    }
+    
+    memset( &stLayerAttr, 0, sizeof( stLayerAttr ) );
+    stLayerAttr.stImageSize.u32Width  = 240;//240
+    stLayerAttr.stImageSize.u32Height = 320;
+    
+    stLayerAttr.panel_type = 0;
+    stLayerAttr.rotate = 0;
+    stLayerAttr.dithering_flag = 0;
+    stLayerAttr.dithering_en = 0;
+    stLayerAttr.gamma_en = 0;
+    stLayerAttr.hue_en = 0;
+    stLayerAttr.sat_en = 0;
+    stLayerAttr.con_en = 0;
+    stLayerAttr.bright_en = 0;
+    stLayerAttr.theta_sign = 0;
+    stLayerAttr.contrast = 0;
+    stLayerAttr.theta_abs = 0;
+    stLayerAttr.saturation = 0;
+    stLayerAttr.off_contrast = 0;
+    stLayerAttr.off_bright = 0;
+    stLayerAttr.user_control_disp = 1;
+    stLayerAttr.big_endian = 0;
+    
+    ret = HB_VOT_SetVideoLayerAttr( 0, &stLayerAttr );
+    
+    if( ret ) {
+        printf( "HB_VOT_SetVideoLayerAttr failed.\n" );
+    }
+    
+    ret = HB_VOT_EnableVideoLayer( 0 );
+    
+    if( ret ) {
+        printf( "HB_VOT_EnableVideoLayer failed.\n" );
+    }
+    
+    stChnAttr.u32Priority = 2;
+    stChnAttr.s32X = 0;
+    stChnAttr.s32Y = 0;
+    stChnAttr.u32SrcWidth = 256;//240
+    stChnAttr.u32SrcHeight = 320;
+    stChnAttr.u32DstWidth = 256;
+    stChnAttr.u32DstHeight = 320;
+    ret = HB_VOT_SetChnAttr( 0, 0, &stChnAttr );
+    printf( "HB_VOT_SetChnAttr 0: %d\n", ret );
+    
+    cropAttrs.u32Width = 240;//stChnAttr.u32DstWidth;
+    cropAttrs.u32Height = 320;//stChnAttr.u32DstHeight;
+    ret = HB_VOT_SetChnCrop( 0, 0, &cropAttrs );
+    printf( "HB_VOT_EnableChn: %d\n", ret );
+    
+    ret = HB_VOT_EnableChn( 0, 0 );
+    printf( "HB_VOT_EnableChn: %d\n", ret );
+    
+    /* malloc resources */
+    g_dump_buffer = ( uint8_t * )malloc( MY_DISP_HOR_RES * MY_DISP_VER_RES * 4 );
+    memset( g_dump_buffer, 0x0, MY_DISP_HOR_RES * MY_DISP_VER_RES * 4 );
+    
+    g_yuv_buffer = ( uint8_t * )malloc( sizeof( uint8_t ) * MY_DISP_HOR_RES *
+                                        MY_DISP_VER_RES * 3 / 2 );
+    memset( g_yuv_buffer, 0x0, MY_DISP_HOR_RES * MY_DISP_VER_RES * 3 / 2 );
+    
+    g_rotated_yuv_buffer = ( uint8_t * )malloc( sizeof( uint8_t ) * MY_DISP_HOR_RES
+                                                * MY_DISP_VER_RES * 3 / 2 );
+    memset( g_rotated_yuv_buffer, 0x0, MY_DISP_HOR_RES * MY_DISP_VER_RES * 3 / 2 );
+}
+
+static void disp_exit( void )
+{
+    /*You code here*/
+    int ret;
+    
+    free( g_rotated_yuv_buffer );
+    free( g_yuv_buffer );
+    free( g_rotated_yuv_buffer );
+    
+    ret = HB_VOT_DisableChn( 0, 0 );
+    
+    if( ret ) {
+        printf( "HB_VOT_DisableChn failed.\n" );
+    }
+    
+    ret = HB_VOT_DisableVideoLayer( 0 );
+    
+    if( ret ) {
+        printf( "HB_VOT_DisableVideoLayer failed.\n" );
+    }
+    
+    ret = HB_VOT_Disable( 0 );
+    
+    if( ret ) {
+        printf( "HB_VOT_Disable failed.\n" );
+    }
+}
+
+/*Flush the content of the internal buffer the specific area on the display
+ *You can use DMA or any hardware acceleration to do this operation in the background but
+ *'lv_disp_flush_ready()' has to be called when finished.*/
+static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
+                        lv_color_t *color_p )
+{
+    /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
+    // int ret;
+    // int x, y;
+    // uint32_t pixel_count = 0;
+    // uint32_t tmp_rgb_888;
+    // lv_color_t *tmp_color_p = color_p;
+    // struct timeval starttime;
+    // struct timeval endtime;
+    VOT_FRAME_INFO_S stFrame = {};
+    
+    // union rgb888 dump_buffer[MY_DISP_HOR_RES * MY_DISP_VER_RES] = { 0 };
+    // uint8_t *dump_buffer_p = g_dump_buffer;
+    // uint8_t yuv_buffer[MY_DISP_HOR_RES * MY_DISP_VER_RES * 3 / 2] = { 0 };
+    // uint8_t rotated_yuv_buffer[MY_DISP_HOR_RES * MY_DISP_VER_RES * 3 / 2] = { 0 };
+    
+    /* clear memory */
+    // memset( g_dump_buffer, 0x0, MY_DISP_HOR_RES * MY_DISP_VER_RES *
+    //         sizeof( union rgb888 ) );
+    // memset( g_yuv_buffer, 0x0,
+    //         sizeof( uint8_t ) * MY_DISP_HOR_RES * MY_DISP_VER_RES * 3 / 2 );
+    // memset( g_rotated_yuv_buffer, 0x0,
+    //         sizeof( uint8_t ) * MY_DISP_HOR_RES * MY_DISP_VER_RES * 3 / 2 );
+    
+#if 0
+    
+    for( y = area->y1; y < area->y2; y++ ) {
+        for( x = area->x1; x < area->x2; x++ ) {
+            tmp_rgb_888 = ( color_p++ )->full & 0xFFFFFF; /* convert rgb32 to rgb24 */
+            
+            // g_dump_buffer[pixel_count].channel.r = ( tmp_rgb_888 >> 16 );
+            // g_dump_buffer[pixel_count].channel.g = ( ( tmp_rgb_888 >> 8 ) & 0xFF );
+            // g_dump_buffer[pixel_count].channel.b = ( tmp_rgb_888 & 0xFF );
+            
+            g_dump_buffer[pixel_count].data[0] = ( tmp_rgb_888 >> 16 );
+            g_dump_buffer[pixel_count].data[1] = ( ( tmp_rgb_888 >> 8 ) & 0xFF );
+            g_dump_buffer[pixel_count++].data[2] = ( tmp_rgb_888 & 0xFF );
+            
+            // pixel_count++;
+            // tmp_color_p++;
+        }
+    }
+    
+#endif
+    
+    // gettimeofday( &starttime, NULL );
+    /* memcpy BRGA 4 bytes data to buffer */
+    memcpy( g_dump_buffer, &color_p->full,
+            ( MY_DISP_HOR_RES * MY_DISP_VER_RES )*sizeof( lv_color_t ) );
+            
+    // gettimeofday( &endtime, NULL );
+    // printf( "Time process : %ld us\n", endtime.tv_usec - starttime.tv_usec );
+    // gettimeofday( &starttime, NULL );
+    
+    /* covert BGRA32 to yuv420 nv12 */
+    bgra2nv12( MY_DISP_HOR_RES, MY_DISP_VER_RES, g_dump_buffer, g_yuv_buffer );
+    
+    /* rotate 90 degree of nv12 */
+    // rotate_yuv420sp( g_yuv_buffer, g_rotated_yuv_buffer, MY_DISP_HOR_RES,
+    //                  MY_DISP_VER_RES );
+    // printf( "Time start   : %ld us\n", starttime.tv_usec );
+    // printf( "Time end     : %ld us\n", endtime.tv_usec );
+    
+    stFrame.addr = g_yuv_buffer;
+    // stFrame.addr = g_rotated_yuv_buffer;
+    stFrame.size = 122880;
+    
+    HB_VOT_SendFrame( 0, 0, &stFrame, -1 );
+    // gettimeofday( &endtime, NULL );
+    // printf( "Time process : %ld us\n", endtime.tv_usec - starttime.tv_usec );
+    // ret = HB_VOT_SendFrame( 0, 0, &stFrame, -1 );
+    
+    // if( ret ) {
+    // printf( "HB_VOT_SendFrame failed\n" );
+    // }
+    
+    /*IMPORTANT!!!
+     *Inform the graphics library that you are ready with the flushing*/
+    lv_disp_flush_ready( disp_drv );
+}
+
+/*OPTIONAL: GPU INTERFACE*/
+
+/*If your MCU has hardware accelerator (GPU) then you can use it to fill a memory with a color*/
+// static void gpu_fill(lv_disp_drv_t * disp_drv, lv_color_t * dest_buf, lv_coord_t dest_width,
+//                    const lv_area_t * fill_area, lv_color_t color)
+// {
+//    /*It's an example code which should be done by your GPU*/
+//    int32_t x, y;
+//    dest_buf += dest_width * fill_area->y1; /*Go to the first line*/
+
+//    for(y = fill_area->y1; y <= fill_area->y2; y++) {
+//        for(x = fill_area->x1; x <= fill_area->x2; x++) {
+//            dest_buf[x] = color;
+//        }
+//        dest_buf+=dest_width;    /*Go to the next line*/
+//    }
+// }
+
+
+static inline unsigned char clip_value( unsigned char x, unsigned char min_val,
+                                        unsigned char max_val )
+{
+    if( x > max_val ) {
+        return max_val;
+    }
+    else if( x < min_val ) {
+        return min_val;
+    }
+    else {
+        return x;
+    }
+}
+
+static inline void rotate_yuv420sp( uint8_t *src, uint8_t *dst, int width,
+                                    int height )
+{
+    // byte[] dst = new byte[src.length];
+    int wh = width * height;
+    //旋转Y
+    int k = 0;
+    
+    for( int i = 0; i < width; i++ ) {
+        for( int j = height - 1; j >= 0; j-- ) {
+            dst[k] = src[width * j + i];
+            k++;
+        }
+    }
+    
+    int halfWidth = width / 2;
+    int halfHeight = height / 2;
+    
+    for( int colIndex = 0; colIndex < halfWidth; colIndex++ ) {
+        for( int rowIndex = halfHeight - 1; rowIndex >= 0; rowIndex-- ) {
+            int index = ( halfWidth * rowIndex + colIndex ) * 2;
+            dst[k++] = src[wh + index];
+            dst[k++] = src[wh + index + 1];
+        }
+    }
+}
+static inline void rgb2nv12( int w, int h, unsigned char *RgbBuf,
+                             unsigned char *yuvBuf )
+{
+    unsigned char *ptrY, *ptrU, *ptrV, *ptrRGB;
+    unsigned char y, u, v, r, g, b;
+    // memset( yuvBuf, 0, w * h * 3 / 2 );
+    ptrY = yuvBuf;
+    ptrU = yuvBuf + w * h;
+    ptrV = ptrU + 1;
+    int i = 0, j = 0;
+    
+    for( j = 0; j < h; j++ ) {
+        ptrRGB = RgbBuf + w * j * 3;
+        
+        for( i = 0; i < w; i++ ) {
+            r = *( ( ptrRGB ++ ) );
+            g = *( ( ptrRGB ++ ) );
+            b = *( ( ptrRGB ++ ) );
+            
+            y = ( unsigned char )( ( 66 * r + 129 * g +  25 * b + 128 ) >> 8 ) + 16;
+            u = ( unsigned char )( ( -38 * r -  74 * g + 112 * b + 128 ) >> 8 ) + 128;
+            v = ( unsigned char )( ( 112 * r -  94 * g -  18 * b + 128 ) >> 8 ) + 128;
+            
+            *( ptrY++ ) = clip_value( y, 0, 255 );
+            
+            if( j % 2 == 0 && i % 2 == 0 ) {
+                *( ptrU ) = clip_value( u, 0, 255 );
+                ptrU += 2;
+                *( ptrV ) = clip_value( v, 0, 255 );
+                ptrV += 2;
+            }
+        }
+    }
+}
+
+static inline void bgra2nv12( int w, int h, unsigned char *RgbBuf,
+                              unsigned char *yuvBuf )
+{
+    unsigned char *ptrY, *ptrU, *ptrV, *ptrRGB;
+    unsigned char y, u, v, r, g, b;
+    // memset( yuvBuf, 0, w * h * 3 / 2 );
+    ptrY = yuvBuf;
+    ptrU = yuvBuf + w * h;
+    ptrV = ptrU + 1;
+    int i = 0, j = 0;
+    
+    for( j = 0; j < h; j++ ) {
+        /* The BGRA data in memory like :
+         * B G R A - each pixel costs 4 bytes
+         * so we make a poniter like this:
+         * 
+         *   ptrRGB->[ B G R A ] ... [B G R A]
+         * 
+         * so we can get each channel:
+         * 
+         *   b = *( ( ptrRGB ) );
+         *   g = *( ( ptrRGB + 1 ) );
+         *   r = *( ( ptrRGB + 2 ) );
+         *   a = *( ( ptrRGB + 3 ) );
+         */
+        ptrRGB = RgbBuf + w * j * 4;
+        
+        for( i = 0; i < w; i++ ) {
+            b = *( ( ptrRGB ) );
+            g = *( ( ptrRGB + 1 ) );
+            r = *( ( ptrRGB + 2 ) );
+            /* a = *( ( ptrRGB + 3 ) ); */  /* we don't need alpha channel */
+            ptrRGB += 4;    /* move poniter to next pixel */
+            
+            y = ( unsigned char )( ( 66 * r + 129 * g +  25 * b + 128 ) >> 8 ) + 16;
+            u = ( unsigned char )( ( -38 * r -  74 * g + 112 * b + 128 ) >> 8 ) + 128;
+            v = ( unsigned char )( ( 112 * r -  94 * g -  18 * b + 128 ) >> 8 ) + 128;
+            
+            *( ptrY++ ) = clip_value( y, 0, 255 );
+            
+            if( j % 2 == 0 && i % 2 == 0 ) {
+                *( ptrU ) = clip_value( u, 0, 255 );
+                ptrU += 2;
+                *( ptrV ) = clip_value( v, 0, 255 );
+                ptrV += 2;
+            }
+        }
+    }
+}
+
+#if 0
+void rgb2yuv420p( int w, int h, unsigned char *RgbBuf, unsigned char *yuvBuf )
+{
+    unsigned char *ptrY, *ptrU, *ptrV, *ptrRGB;
+    unsigned char y, u, v, r, g, b;
+    memset( yuvBuf, 0, w * h * 3 / 2 );
+    ptrY = yuvBuf;
+    ptrU = yuvBuf + w * h;
+    ptrV = ptrU + ( w * h * 1 / 4 );
+    int i = 0, j = 0;
+    
+    for( j = 0; j < h; j++ ) {
+        ptrRGB = RgbBuf + w * j * 3;
+        
+        for( i = 0; i < w; i++ ) {
+            r = *( ptrRGB++ );
+            g = *( ptrRGB++ );
+            b = *( ptrRGB++ );
+            
+            y = ( unsigned char )( ( 66 * r + 129 * g +  25 * b + 128 ) >> 8 ) + 16;
+            u = ( unsigned char )( ( -38 * r -  74 * g + 112 * b + 128 ) >> 8 ) + 128;
+            v = ( unsigned char )( ( 112 * r -  94 * g -  18 * b + 128 ) >> 8 ) + 128;
+            
+            *( ptrY++ ) = clip_value( y, 0, 255 );
+            
+            if( j % 2 == 0 && i % 2 == 0 ) {
+                *( ptrU++ ) = clip_value( u, 0, 255 );
+            }
+            else {
+                if( i % 2 == 0 ) {
+                    *( ptrV++ ) = clip_value( v, 0, 255 );
+                }
+            }
+        }
+    }
+}
+#endif
+
+#else /*Enable this file at the top*/
+
+/*This dummy typedef exists purely to silence -Wpedantic.*/
+typedef int keep_pedantic_happy;
+#endif
