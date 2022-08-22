@@ -14,7 +14,7 @@ file(GLOB_RECURSE INCLUDES "include/*.h")
 file(GLOB_RECURSE SOURCES "src/*.c")
 
 # rest of your project
-add_executable(epink main.c ${INCLUDES} ${SOURCES})
+add_executable(epink main.c src/font_8x16.c)
 
 target_include_directories(epink PUBLIC .)
 target_link_libraries(epink pico_stdlib hardware_spi)
