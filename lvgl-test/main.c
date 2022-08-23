@@ -421,13 +421,14 @@ void epink_flush()
         }
     }
     
+    // sleep_ms(100);
     epink_turn_on_display();
 }
 
 /**
  * @brief Simply clear the display buffer to 0xFF 
  */
-static void epink_buffer_clear()
+void epink_buffer_clear()
 {
     for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
         epink_disp_buffer[i] = 0xFF;
@@ -621,18 +622,23 @@ int main( void )
     // sleep_ms( 500 );
 
     // epink_clear( 0x00 );
-    // sleep_ms(500);
+    // sleep_ms(200);
     // epink_clear( 0xFF );
-    // sleep_ms(500);
+    // sleep_ms(200);
 
     // lv_demo_widgets();
-    lv_obj_t *label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "Hello");
-    lv_obj_center(label);
+    lv_demo_stress();
+
+    // lv_obj_t *btn = lv_btn_create(lv_scr_act());
+    // // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
+    // lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 20);
+    // // lv_obj_center(btn);
+
+    // lv_obj_t *label = lv_label_create(btn);
+    // lv_label_set_text(label, "hello");
 
     // lv_timer_t *timer =  lv_timer_create(lv_epink_update_cb, 33, NULL);
-    // lv_timer_set_period(timer, 2000);
-
+    // lv_timer_set_period(timer, 500);
 
     // sleep_ms(200);
     while( 1 ) {
@@ -692,9 +698,9 @@ int main( void )
         // epink_putascii_string( 0, 0, TEST_DOC );
         // epink_flush();
         // sleep_ms( 500 );
-        lv_task_handler();
+        sleep_us(5*1000);
+        lv_timer_handler();
         lv_tick_inc(5);
-        sleep_ms(5);
     }
     
     return 0;
