@@ -569,7 +569,6 @@ static void hal_init(void)
 #warning spi/bme280_spi example requires a board with SPI pins
     puts( "Default SPI pins were not defined" );
 #else
-    
     /* Useing default SPI0 at 50MHz */
     spi_init( spi_default, 50 * 1000 * 1000 );
     gpio_set_function( PICO_DEFAULT_SPI_SCK_PIN, GPIO_FUNC_SPI );
@@ -590,12 +589,18 @@ static void hal_init(void)
     
     gpio_init( EPINK_BUSY_PIN );
     gpio_set_dir( EPINK_BUSY_PIN, GPIO_IN );
+#endif
 }
 
 static void lv_epink_update_cb(lv_timer_t * timer)
 {
     LV_LOG_WARN("%s called", __func__);
     epink_flush();
+}
+
+static void anim_y_cb(void *var, int32_t v)
+{
+    lv_obj_set_y(var, v);
 }
 
 int main( void )
@@ -627,82 +632,37 @@ int main( void )
     // sleep_ms(200);
 
     // lv_demo_widgets();
-    lv_demo_stress();
+    // lv_demo_stress();
+    // lv_demo_music();
 
-    // lv_obj_t *btn = lv_btn_create(lv_scr_act());
-    // // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
-    // lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 20);
-    // // lv_obj_center(btn);
+    lv_obj_t *btn = lv_btn_create(lv_scr_act());
+    // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
+    lv_obj_set_style_radius(btn, 10, 0);
+    lv_obj_set_style_border_width(btn, 3, 0);
+    lv_obj_center(btn);
 
-    // lv_obj_t *label = lv_label_create(btn);
-    // lv_label_set_text(label, "hello");
+    LV_FONT_DECLARE(lv_font_montserrat_22);
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, "embeddedboys");
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
 
-    // lv_timer_t *timer =  lv_timer_create(lv_epink_update_cb, 33, NULL);
-    // lv_timer_set_period(timer, 500);
+    // lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 0);
+    // lv_anim_t a;
+    // lv_anim_init(&a);
 
-    // sleep_ms(200);
+    // lv_anim_set_var(&a, btn);
+    // lv_anim_set_values(&a, lv_obj_get_y(btn), 150);
+    // lv_anim_set_time(&a, 1000);
+    // lv_anim_set_exec_cb(&a, anim_y_cb);
+    // lv_anim_set_path_cb(&a, lv_anim_path_bounce);
+    // lv_anim_start(&a);
+
     while( 1 ) {
-        // epink_clear(0xFF);
-        // epink_turn_on_display();
-        // sleep_ms(200);
-        // epink_buffer_clear();
-        // for( uint8_t x = 0, y = 0; x < 200; x++, y++ ) {
-        //     // EPINK_DEBUG("x:%d, y:%d\n", x, y);
-        //     // epink_draw_pixel( x-1, y-1, 1);
-        //     epink_draw_pixel( x, y, 1 );
-        //     epink_draw_pixel( x + 1, y, 1 );
-        //     epink_draw_pixel( x + 2, y, 1 );
-        //     epink_draw_pixel( x + 3, y, 1 );
-        //     epink_draw_pixel( x + 4, y, 1 );
-        // }
-    
-        // for( uint8_t x = 200, y = 0; x > 0; x--, y++ ) {
-        //     // EPINK_DEBUG("x:%d, y:%d\n", x, y);
-        //     // epink_draw_pixel( x-1, y-1, 1);
-        //     epink_draw_pixel( x, y, 1 );
-        //     epink_draw_pixel( x + 1, y, 1 );
-        //     epink_draw_pixel( x + 2, y, 1 );
-        //     epink_draw_pixel( x + 3, y, 1 );
-        //     epink_draw_pixel( x + 4, y, 1 );
-        // }
-        // epink_flush();
-        // sleep_ms( 200 );
-        // epink_putascii(50,50,'A');
-        // epink_buffer_clear();
-    
-        // for( int y = 0; y < 200; y += 16 ) {
-        //     epink_putascii_string( 0, y, "Hello, world!" );
-        // }
-    
-        // epink_flush();
-        // sleep_ms( 200 );
-    
-        // epink_buffer_clear();
-    
-        // for( int y = 0; y < 200; y += 16 ) {
-        //     epink_putascii_string( 50, y, "Hello, world!" );
-        // }
-    
-        // epink_flush();
-        // sleep_ms( 200 );
-    
-        // epink_buffer_clear();
-    
-        // for( int y = 0; y < 200; y += 16 ) {
-        //     epink_putascii_string( 100, y, "Hello, world!" );
-        // }
-    
-        // epink_flush();
-        // sleep_ms( 200 );
-
-        // epink_putascii_string( 0, 0, TEST_DOC );
-        // epink_flush();
-        // sleep_ms( 500 );
         sleep_us(5*1000);
         lv_timer_handler();
         lv_tick_inc(5);
     }
     
     return 0;
-#endif
+
 }

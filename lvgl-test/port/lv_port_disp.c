@@ -58,7 +58,7 @@ static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t bu
  *  STATIC VARIABLES
  **********************/
 extern uint8_t epink_disp_buffer[200*200/8];
-int pixel_count=0;
+// int pixel_count=0;
 
 /**********************
  *      MACROS
@@ -196,7 +196,7 @@ static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t bu
     }
     
     // printf("x:%d, y:%d\n", x, y);
-    pixel_count++;
+    // pixel_count++;
 }
 
 /*Flush the content of the internal buffer the specific area on the display
@@ -225,8 +225,8 @@ static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
     // printf("\n");
     // printf("\n");
     // printf("\n");
-    printf("pixel count:%d\n", pixel_count);
-    pixel_count=0;
+    // printf("pixel count:%d\n", pixel_count);
+    // pixel_count=0;
 
     // memcpy(epink_disp_buffer, &color_p->full, 200*200/8);
     epink_flush();
