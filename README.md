@@ -26,12 +26,15 @@ $ git clone https://github.com/raspberrypi/openocd.git --recursive --branch rp20
 
 $ ./bootstrap
 $ ./configure --enable-cmsis-dap
+$ make -j12
 $ sudo make install
 ```
 
-Source ENV
+Source ENV and export Toolboxs
 ----------
-The load and reset script only comptible with CMSIS-DAPLINK, so if you choose anthoer
+This will export the path of `pcio-sdk` and some script to environment.
+
+The `load`, `reset` etc. scripts only comptibled with `CMSIS-DAPLINK`, so if you use anthoer
 debugger, change the debugger type in script.
 ```shell
 $ source tools/envsetup.sh
@@ -41,7 +44,7 @@ The `daplink-reset` and `daplink-program` will be added to your shell env
 Build examples
 --------------
 ```shell
-$ cd epink-1.54
+$ cd epink-allinone
 $ mkdir build && cd build
 $ cmake ..
 $ make -j
@@ -56,7 +59,37 @@ $ daplink-program epink.elf
 More
 ----
 
-#### How to create a new example folder
+### How to use GDB with OpenOCD
+
+First, start a OpenOCD debugger client, you can use `daplink-debug.sh` to start it or just start it maunally like:
+```shell
+$ openocd -f ... -f ... "gdb_port 3333"
+```
+
+Then use `gdb-multiarch` load program
+```shell
+$ gdb-multiarch ./epink.elf
+
+/* specify a remote target debugger */
+(gdb) target remote localhost:3333
+
+/* set a breakpoint at main function 614 line */
+(gdb) break main:614
+
+/* look up we have any breakpoints */
+(gdb) info breakpoints
+
+/* reset and halt mcu */
+(gdb) monitor reset halt
+
+/* run program to first breakpoint */
+(gdb) continue
+
+/* run to the next or end */
+(gdb) continue
+```
+
+### How to create a new example folder
 ```shell
 $ mkdir hello && cd hello
 $ cp pico-sdk/external/pico_sdk_import.cmake .
