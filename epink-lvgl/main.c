@@ -54,6 +54,8 @@
 
 #include "port/lv_port_disp.h"
 
+#include "ui/ui.h"
+
 /* Pins Define of rpi-pico
  *
  * The SPI interface using default spi0
@@ -62,9 +64,10 @@
  * DC   <->  GP15
  * BUSY <->  GP20
  */
-#define EPINK_RES_PIN   14
-#define EPINK_DC_PIN    15
-#define EPINK_BUSY_PIN  20
+#define EPINK_RES_PIN   15
+#define EPINK_DC_PIN    14
+#define EPINK_CS_PIN    13
+#define EPINK_BUSY_PIN  12
 
 /* ========== epink panel info ========== */
 #define EPINK_WIDTH         200
@@ -123,18 +126,18 @@ extern unsigned char fontdata_mini_4x6[1536];
 extern unsigned char fontdata_8x16[4096];
 
 /* ========== epink pin controls ========== */
-#ifdef PICO_DEFAULT_SPI_CSN_PIN
+#ifdef EPINK_CS_PIN
 static inline void cs_select()
 {
     asm volatile( "nop \n nop \n nop" );
-    gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 0 ); // Active low
+    gpio_put( EPINK_CS_PIN, 0 ); // Active low
     asm volatile( "nop \n nop \n nop" );
 }
 
 static inline void cs_deselect()
 {
     asm volatile( "nop \n nop \n nop" );
-    gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 1 );
+    gpio_put( EPINK_CS_PIN, 1 );
     asm volatile( "nop \n nop \n nop" );
 }
 #endif
@@ -565,7 +568,7 @@ static void hal_init(void)
 {
     stdio_init_all();
 
-#if !defined(spi_default) || !defined(PICO_DEFAULT_SPI_SCK_PIN) || !defined(PICO_DEFAULT_SPI_TX_PIN) || !defined(PICO_DEFAULT_SPI_RX_PIN) || !defined(PICO_DEFAULT_SPI_CSN_PIN)
+#if !defined(spi_default) || !defined(PICO_DEFAULT_SPI_SCK_PIN) || !defined(PICO_DEFAULT_SPI_TX_PIN) || !defined(PICO_DEFAULT_SPI_RX_PIN) || !defined(EPINK_CS_PIN)
 #warning spi/bme280_spi example requires a board with SPI pins
     puts( "Default SPI pins were not defined" );
 #else
@@ -576,10 +579,10 @@ static void hal_init(void)
     bi_decl( bi_2pins_with_func( PICO_DEFAULT_SPI_TX_PIN, PICO_DEFAULT_SPI_SCK_PIN,
                                  GPIO_FUNC_SPI ) );
     
-    gpio_init( PICO_DEFAULT_SPI_CSN_PIN );
-    gpio_set_dir( PICO_DEFAULT_SPI_CSN_PIN, GPIO_OUT );
-    gpio_put( PICO_DEFAULT_SPI_CSN_PIN, 1 );
-    bi_decl( bi_1pin_with_name( PICO_DEFAULT_SPI_CSN_PIN, "SPI CS" ) );
+    gpio_init( EPINK_CS_PIN );
+    gpio_set_dir( EPINK_CS_PIN, GPIO_OUT );
+    gpio_put( EPINK_CS_PIN, 1 );
+    bi_decl( bi_1pin_with_name( EPINK_CS_PIN, "SPI CS" ) );
     
     gpio_init( EPINK_RES_PIN );
     gpio_set_dir( EPINK_RES_PIN, GPIO_OUT );
@@ -603,6 +606,35 @@ static void anim_y_cb(void *var, int32_t v)
     lv_obj_set_y(var, v);
 }
 
+extern lv_obj_t *ui_RollerHour;
+extern lv_obj_t *ui_RollerMinute;
+extern lv_obj_t *ui_RollerHour;
+
+static uint8_t hour = 0;
+static uint8_t minute = 0;
+static uint8_t second = 0;
+
+static void lv_timer_roller_time_cb()
+{
+    lv_roller_set_selected(ui_RollerSecond, ++second, LV_ANIM_OFF);
+    
+    if (second == 60) {
+        second = 0;
+        lv_roller_set_selected(ui_RollerSecond, second, LV_ANIM_OFF);
+        lv_roller_set_selected(ui_RollerMinute, ++minute, LV_ANIM_OFF);
+    }
+
+    if (minute == 60) {
+        minute = 0;
+        lv_roller_set_selected(ui_RollerMinute, minute, LV_ANIM_OFF);
+        lv_roller_set_selected(ui_RollerHour, ++hour, LV_ANIM_OFF);
+    }
+
+    if (hour == 24)
+        hour=0;
+
+}
+
 int main( void )
 {
     stdio_init_all();
@@ -614,7 +646,7 @@ int main( void )
 
     printf("%s\n", __func__);
 
-    epink_init( EPINK_UPDATE_MODE_PART );
+    epink_init( EPINK_UPDATE_MODE_FULL );
 
     /*  a global clear before drawing operations  */
     epink_clear( 0x00 );
@@ -622,6 +654,13 @@ int main( void )
     epink_clear( 0xFF );
     sleep_ms(200);
 
+    epink_init( EPINK_UPDATE_MODE_PART );
+
+    epink_clear( 0x00 );
+    sleep_ms(200);
+    epink_clear( 0xFF );
+    sleep_ms(200);
+    
     // epink_putascii_string( 0, 0, TEST_DOC );
     // epink_flush();
     // sleep_ms( 500 );
@@ -634,17 +673,22 @@ int main( void )
     // lv_demo_widgets();
     // lv_demo_stress();
     // lv_demo_music();
+    ui_init();
 
-    lv_obj_t *btn = lv_btn_create(lv_scr_act());
+    lv_timer_t *timer_roller = lv_timer_create_basic();
+    timer_roller->timer_cb = lv_timer_roller_time_cb;
+    timer_roller->period = 1000;
+
+    // lv_obj_t *btn = lv_btn_create(lv_scr_act());
     // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
-    lv_obj_set_style_radius(btn, 10, 0);
-    lv_obj_set_style_border_width(btn, 3, 0);
-    lv_obj_center(btn);
+    // lv_obj_set_style_radius(btn, 10, 0);
+    // lv_obj_set_style_border_width(btn, 3, 0);
+    // lv_obj_center(btn);
 
-    LV_FONT_DECLARE(lv_font_montserrat_22);
-    lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, "embeddedboys");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
+    // LV_FONT_DECLARE(lv_font_montserrat_22);
+    // lv_obj_t *label = lv_label_create(btn);
+    // lv_label_set_text(label, "embeddedboys");
+    // lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
 
     // lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 0);
     // lv_anim_t a;

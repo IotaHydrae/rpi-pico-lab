@@ -155,8 +155,8 @@ void lv_port_disp_init( void )
 
     // lv_disp_set_rotation(disp, LV_DISP_ROT_90);
     /* set a mono theme */
-    lv_theme_t *th = lv_theme_mono_init(disp, 1, &lv_font_montserrat_14);
-    lv_disp_set_theme(disp, th);
+    // lv_theme_t *th = lv_theme_mono_init(disp, 1, &lv_font_montserrat_10);
+    // lv_disp_set_theme(disp, th);
 }
 
 /**********************
@@ -188,7 +188,7 @@ static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t bu
     // buf += buf_w/8 * y;
     // buf += x/8;
 
-    if(lv_color_brightness(color) > 128) {
+    if(lv_color_brightness(color) < 128) {
         pen[y * 25 + page] &= ~( 1 << ( 7 - page_left ) );
     }
     else {

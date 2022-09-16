@@ -10,8 +10,8 @@ project(epink)
 pico_sdk_init()
 
 # add include and src files
-file(GLOB_RECURSE INCLUDES "include/*.h" "port/*.h")
-file(GLOB_RECURSE SOURCES "lvgl/src/*.c" "font/*.c" "port/*.c" "lvgl/demos/stress/*.c")#"lvgl/demos/music/*.c" )
+file(GLOB_RECURSE INCLUDES "include/*.h" "port/*.h" "ui/*.h")
+file(GLOB_RECURSE SOURCES "lvgl/src/*.c" "font/*.c" "port/*.c" "ui/*.c")#"lvgl/demos/music/*.c" )
 
 # rest of your project
 add_executable(epink main.c ${INCLUDES} ${SOURCES})
