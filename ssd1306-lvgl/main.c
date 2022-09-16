@@ -5,14 +5,13 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 
-#include "ssd1306.h"
+#include "lvgl/lvgl.h"
+#include "lvgl/demos/lv_demos.h"
 
-int main()
+#include "port/lv_port_disp.h"
+
+void hal_init()
 {
-	int rc;
-	uint8_t wbuf[8] = {0}, rbuf[8] = {0};
-	stdio_init_all();
-
 	i2c_init(i2c_default, 400 * 1000);
 	gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
 	gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
@@ -20,32 +19,52 @@ int main()
 	gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
 
 	ssd1306_init();
+}
 
-	while (true)
-	{
-		printf("Hello, world!\n");
-		for (int x = 0; x < 128; x++)
-		{
-			for (int y = 0; y < 64; y++)
-			{
-				ssd1306_set_pixel(x, y, 1);
-			}
-		}
+static void anim_y_cb(void *var, int32_t v)
+{
+    lv_obj_set_y(var, v);
+}
 
-		ssd1306_flush();
-		sleep_ms(500);
+int main()
+{
+	stdio_init_all();
 
-		for (int x = 0; x < 128; x++)
-		{
-			for (int y = 0; y < 64; y++)
-			{
-				ssd1306_set_pixel(x, y, 0);
-			}
-		}
+    hal_init();
 
-		ssd1306_flush();
-		sleep_ms(500);
-	}
+    lv_init();
+    lv_port_disp_init();
 
-	return 0;
+    printf("%s\n", __func__);
+
+    // lv_demo_widgets();
+    // lv_demo_stress();
+    // lv_demo_music();
+
+    lv_obj_t *btn = lv_btn_create(lv_scr_act());
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
+    lv_obj_set_style_radius(btn, 10, 0);
+    lv_obj_center(btn);
+
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, "embeddedboys");
+
+    lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 0);
+    lv_anim_t a;
+    lv_anim_init(&a);
+
+    lv_anim_set_var(&a, btn);
+    lv_anim_set_values(&a, lv_obj_get_y(btn), 20);
+    lv_anim_set_time(&a, 200);
+    lv_anim_set_exec_cb(&a, anim_y_cb);
+    lv_anim_set_path_cb(&a, lv_anim_path_linear);
+    lv_anim_start(&a);
+
+    while( 1 ) {
+        sleep_us(5*1000);
+        lv_timer_handler();
+        lv_tick_inc(5);
+    }
+    
+    return 0;
 }

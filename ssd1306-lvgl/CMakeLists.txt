@@ -9,10 +9,12 @@ project(ssd1306)
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-# rest of your project
-add_executable(ssd1306 main.c ssd1306.c)
+file(GLOB_RECURSE INCLUDES "include/*.h" "port/*.h" "ui/*.h")
+file(GLOB_RECURSE SOURCES "lvgl/src/*.c" "port/*.c" "ui/*.c")
 
-target_include_directories(ssd1306 PUBLIC .)
+add_executable(ssd1306 main.c ${INCLUDES} ${SOURCES})
+
+target_include_directories(ssd1306 PUBLIC . "lvgl")
 target_link_libraries(ssd1306 pico_stdlib hardware_i2c)
 
 pico_enable_stdio_usb(ssd1306 0)

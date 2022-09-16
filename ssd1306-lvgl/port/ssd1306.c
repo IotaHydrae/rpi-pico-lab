@@ -131,7 +131,6 @@ void ssd1306_flush()
 
 	for (page = 0; page < SSD1306_PAGE_SIZE; page++)
 		for (col = 0; col < SSD1306_HOR_RES_MAX; col++)
-		// if (oled_buffer[OFFSET(page, col)] != 0x00)
 		{
 			ssd1306_set_pos(page, col);
 			ssd1306_write_data(ssd1306_buffer[OFFSET(page, col)]);
@@ -143,7 +142,7 @@ void ssd1306_clear()
 	uint8_t page, col;
 
 	for (page = 0; page < SSD1306_PAGE_SIZE; page++)
-		for (col = 0; col < 128; col++)
+		for (col = 0; col < SSD1306_HOR_RES_MAX; col++)
 			if (ssd1306_buffer[OFFSET(page, col)] > 0x00)
 			{
 				ssd1306_set_pos(page, col);
@@ -164,23 +163,13 @@ void ssd1306_set_pixel(uint8_t x, uint8_t y, uint8_t color)
 #endif
 		page = y / 8;
 		page_left = y % 8 == 0 ? 0 : y % 8;
-        // printf("page, page_left: %d, %d\n",page, page_left);
 
 		if (color)
-		{
 			pen[OFFSET(page, x)] |= (1 << page_left);
-            // printf("+++ pos : %d, dump: %d\n", OFFSET(page, x), pen[OFFSET(page, x)]);
-		}
 		else
-		{
 			pen[OFFSET(page, x)] &= ~(1 << page_left);
-            // printf("--- pos : %d, dump: %d\n", OFFSET(page, x), pen[OFFSET(page, x)]);
-		}
 
 #ifdef OLED_COORD_CHECK
 	}
 #endif
-
-	/*oled_set_pos(page, x);
-	oled_write_dat(oled_buffer[offset]);*/
 }
