@@ -39,6 +39,17 @@
 #define CST816T_RST	8
 #define CST816T_INT	9
 
+#define CST816T_ADDR 0x15
+
+void cst816t_reset(void)
+{
+	gpio_put(CST816T_RST, 0);
+	sleep_ms(10);
+
+	gpio_put(CST816T_RST, 1);
+	sleep_ms(10);
+}
+
 int main()
 {
 	int rc;
@@ -48,13 +59,26 @@ int main()
 	i2c_init(i2c1, 400 * 1000);
 	gpio_set_function(CST816T_SDA, GPIO_FUNC_I2C);
 	gpio_set_function(CST816T_SCL, GPIO_FUNC_I2C);
-	gpio_pull_up(6);
-	gpio_pull_up(7);
+	gpio_set_function(CST816T_RST, GPIO_OUT);
+	gpio_set_function(CST816T_INT, GPIO_OUT);
 
-	// uint8_t init_buf[1] = {0xe1};
-	// i2c_write_blocking(i2c_default, 0x38, init_buf, 1, false);
+	gpio_pull_up(CST816T_SDA);
+	gpio_pull_up(CST816T_SCL);
+	gpio_pull_up(CST816T_RST);
 
+	cst816t_reset();
 
+	wbuf[0] = 0xA7;
+	rc = i2c_write_blocking(i2c1, CST816T_ADDR, wbuf, 1, false);
+	if (rc == PICO_ERROR_GENERIC) {
+		printf("write failed!\n");
+	}
+
+	rc = i2c_read_blocking(i2c1, CST816T_ADDR, rbuf, 1, false);
+	if (rc == PICO_ERROR_GENERIC) {
+		printf("read failed!\n");
+	}
+	printf("%s, val: %d\n", __func__, rbuf[0]);
 
 	while(true) {
 
