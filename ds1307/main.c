@@ -34,7 +34,7 @@ int main()
 		w_buf[0] = 0x00;
 		rc = i2c_write_blocking(i2c_default, 0x68, w_buf, 1, false);
 		rc = i2c_read_blocking(i2c_default, 0x68, r_buf, 1, false);
-		second = (r_buf[0]&0x7f)>>4)*10 + (r_buf[0]&0x0f);
+		second = ((r_buf[0]&0x7f)>>4)*10 + (r_buf[0]&0x0f);
 		printf("%d\n",  ((r_buf[0]&0x7f)>>4)*10 + (r_buf[0]&0x0f));
 
 		sleep_ms(1000);
