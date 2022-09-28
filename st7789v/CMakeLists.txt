@@ -13,7 +13,7 @@ pico_sdk_init()
 add_executable(st7789v main.c)
 
 target_include_directories(st7789v PUBLIC .)
-target_link_libraries(st7789v pico_stdlib hardware_spi)
+target_link_libraries(st7789v pico_stdlib hardware_spi hardware_pwm)
 
 pico_enable_stdio_usb(st7789v 0)
 pico_enable_stdio_uart(st7789v 1)

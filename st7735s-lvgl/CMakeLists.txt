@@ -9,8 +9,11 @@ project(st7735s)
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+file(GLOB_RECURSE INCLUDES "include/*.h" "port/*.h" "ui/*.h")
+file(GLOB_RECURSE SOURCES "lvgl/src/*.c" "lvgl/demos/stress/*.c" "port/*.c" "ui/*.c")
+
 # rest of your project
-add_executable(st7735s main.c)
+add_executable(st7735s main.c ${INCLUDES} ${SOURCES})
 
 target_include_directories(st7735s PUBLIC .)
 target_link_libraries(st7735s pico_stdlib hardware_spi hardware_pwm)

@@ -65,6 +65,6 @@ int main()
         lv_timer_handler();
         lv_tick_inc(5);
     }
-    
+
     return 0;
 }
