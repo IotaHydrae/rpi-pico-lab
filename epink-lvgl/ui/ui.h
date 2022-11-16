@@ -38,16 +38,19 @@ extern lv_obj_t * ui_LabelHumidity;
 extern lv_obj_t * ui_LabelTempture;
 extern lv_obj_t * ui_Image4;
 extern lv_obj_t * ui_Image5;
+extern lv_obj_t * ui_LabelTips;
 
 
-LV_IMG_DECLARE(ui_img_line_180_1_png);    // assets\line_180_1.png
-LV_IMG_DECLARE(ui_img_humidity_png);    // assets\humidity.png
-LV_IMG_DECLARE(ui_img_tempture_png);    // assets\tempture.png
+LV_IMG_DECLARE(ui_img_line_180_1_png);    // assets/line_180_1.png
+LV_IMG_DECLARE(ui_img_humidity_png);    // assets/humidity.png
+LV_IMG_DECLARE(ui_img_tempture_png);    // assets/tempture.png
 
 
+LV_FONT_DECLARE(ui_font_NeverMindSemiSerifBold20);
 LV_FONT_DECLARE(ui_font_NeverMindSemiSerifBold40);
 LV_FONT_DECLARE(ui_font_NeverMindSemiSerifBold72);
-LV_FONT_DECLARE(ui_font_NeverMindSemiSerifBold20);
+LV_FONT_DECLARE(ui_font_NeverMindSemiSerifBold16);
+LV_FONT_DECLARE(ui_font_NeverMindSemiSerifBold14);
 
 
 void ui_init(void);

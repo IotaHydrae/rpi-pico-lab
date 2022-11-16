@@ -45,7 +45,6 @@ lv_obj_t * ui_Image1_create(lv_obj_t * comp_parent)
 
     lv_obj_t * cui_Image1;
     cui_Image1 = lv_img_create(comp_parent);
-    lv_img_set_src(cui_Image1, &ui_img_line_180_1_png);
     lv_obj_set_width(cui_Image1, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(cui_Image1, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(cui_Image1, 0);

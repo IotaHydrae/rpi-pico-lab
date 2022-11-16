@@ -54,6 +54,7 @@
 
 #include "port/lv_port_disp.h"
 
+#include "src/widgets/lv_label.h"
 #include "ui/ui.h"
 
 /* Pins Define of rpi-pico
@@ -609,10 +610,12 @@ static void anim_y_cb(void *var, int32_t v)
 extern lv_obj_t *ui_RollerHour;
 extern lv_obj_t *ui_RollerMinute;
 extern lv_obj_t *ui_RollerHour;
+extern lv_obj_t *ui_LabelTips;
 
 static uint8_t hour = 0;
 static uint8_t minute = 0;
 static uint8_t second = 0;
+static uint8_t tips_index = 0;
 
 static void lv_timer_roller_time_cb()
 {
@@ -630,15 +633,33 @@ static void lv_timer_roller_time_cb()
         lv_roller_set_selected(ui_RollerHour, ++hour, LV_ANIM_OFF);
     }
 
-    if (hour == 24)
+    if (hour == 24) {
         hour=0;
+        lv_roller_set_selected(ui_RollerHour, hour, LV_ANIM_OFF);
+    }
 
+}
+
+static const char *g_tips[] = {
+    "Learn to pause.",
+    "Don't Worry, Be Happy.",
+    "Gah! YEEEEEEEE!",
+    "Never laugh at live dragons.",
+    "You are not dead yet.",
+    "Cheers!",
+};
+
+static void lv_timer_label_tips_cb()
+{
+    lv_label_set_text(ui_LabelTips, g_tips[tips_index++]);
+    if (tips_index > (sizeof(g_tips)/sizeof(g_tips[0]) - 1))
+        tips_index = 0;
 }
 
 int main( void )
 {
     stdio_init_all();
-    
+
     hal_init();
 
     lv_init();
@@ -678,6 +699,12 @@ int main( void )
     lv_timer_t *timer_roller = lv_timer_create_basic();
     timer_roller->timer_cb = lv_timer_roller_time_cb;
     timer_roller->period = 1000;
+    
+    lv_label_set_long_mode(ui_LabelTips, LV_LABEL_LONG_WRAP);
+    
+    lv_timer_t *timer_tips = lv_timer_create_basic();
+    timer_tips->timer_cb = lv_timer_label_tips_cb;
+    timer_tips->period = 5000;
 
     // lv_obj_t *btn = lv_btn_create(lv_scr_act());
     // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
