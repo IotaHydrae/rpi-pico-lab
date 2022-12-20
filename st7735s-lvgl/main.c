@@ -48,6 +48,11 @@
 #define ST7735S_CS_PIN    13
 #define ST7735S_BLK_PIN   12
 
+#define ST7735S_HOR_RES     160
+#define ST7735S_VER_RES     128
+
+static uint16_t st7735s_framebuffer[ST7735S_HOR_RES * ST7735S_VER_RES];
+
 /* ========== st7735s pin controls ========== */
 #ifdef PICO_DEFAULT_SPI_CSN_PIN
 static inline void cs_select()
@@ -153,18 +158,18 @@ static void st7735s_device_init(void)
 	st7735s_write_data(0x05);   // RGB565
 
 	/* Colume address set */
-	// st7735s_write_command(CASET);
-	// st7735s_write_data(0x00);
-	// st7735s_write_data(0x00);
-	// st7735s_write_data(0x00);
-	// st7735s_write_data(0x9F);
+	st7735s_write_command(CASET);
+	st7735s_write_data(0x00);
+	st7735s_write_data(0x00);
+	st7735s_write_data(0x00);
+	st7735s_write_data(0x9F);
 
-	// /* Row address set */
-	// st7735s_write_command(RASET);
-	// st7735s_write_data(0x00);
-	// st7735s_write_data(0x00);
-	// st7735s_write_data(0x00);
-	// st7735s_write_data(0x7F);
+	/* Row address set */
+	st7735s_write_command(RASET);
+	st7735s_write_data(0x00);
+	st7735s_write_data(0x00);
+	st7735s_write_data(0x00);
+	st7735s_write_data(0x7F);
 
 	st7735s_write_command(INVON); // Display inversion on
 	st7735s_write_command(DISPON); // Display on
@@ -187,13 +192,35 @@ static void st7735s_set_cursor(uint32_t x, uint32_t y)
 	st7735s_write_data(0x7F);
 }
 
+void st7735s_draw_pixel_immediately(uint32_t x, uint32_t y, uint16_t color)
+{
+    st7735s_set_cursor(x, y);
+    
+    st7735s_write_command(0x2C);
+    st7735s_write_data(color >> 8);
+    st7735s_write_data(color & 0xFF);
+}
+
 void st7735s_draw_pixel(uint32_t x, uint32_t y, uint16_t color)
 {
-	st7735s_set_cursor(x, y);
+    uint16_t *pen = st7735s_framebuffer;
+    
+    pen[x * y] = color;
+}
 
-	st7735s_write_command(RAMWR);
-    st7735s_write_byte(color >> 8);
-    st7735s_write_byte(color & 0xFF);
+void st7735s_flush()
+{
+    uint16_t *pen = st7735s_framebuffer;
+
+    st7735s_set_cursor(0,0);
+    st7735s_write_command(0x2C);
+
+    for (int x = 0; x < ST7735S_HOR_RES; x++) {
+        for (int y = 0; y < ST7735S_VER_RES; y++) {
+            st7735s_write_data(pen[x*y] >> 8);
+            st7735s_write_data(pen[x*y] & 0xFF);
+        }
+    }
 }
 
 void on_pwm_wrap() {
@@ -293,7 +320,7 @@ int main(void)
     // lv_demo_stress();
 
     lv_obj_t *btn = lv_btn_create(lv_scr_act());
-    // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(0x1234), 0);
     lv_obj_set_style_radius(btn, 10, 0);
     lv_obj_center(btn);
 
@@ -301,8 +328,8 @@ int main(void)
     lv_label_set_text(label, "embeddedboys");
 
     while( 1 ) {
-        sleep_us(5*1000);
         lv_timer_handler();
+        sleep_us(5000);
         lv_tick_inc(5);
     }
 

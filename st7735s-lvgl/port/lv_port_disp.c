@@ -65,7 +65,9 @@ static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t bu
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+extern void st7735s_draw_pixel_immediately(uint32_t x, uint32_t y, uint16_t color);
 extern void st7735s_draw_pixel(uint32_t x, uint32_t y, uint16_t color);
+extern void st7735s_flush();
 
 void lv_port_disp_init( void )
 {
@@ -176,7 +178,7 @@ static void disp_exit( void )
 
 static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa)
 {
-    st7735s_draw_pixel(x, y, color.full);
+    st7735s_draw_pixel_immediately(x, y, color.full);
 }
 
 /*Flush the content of the internal buffer the specific area on the display
@@ -200,6 +202,7 @@ static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
     //     }
     //     // printf("\n");
     // }
+    // st7735s_flush();
 
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
