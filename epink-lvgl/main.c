@@ -20,8 +20,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022 LuatOS
- * Copyright (c) 2022 IotaHydrae(writeforever@foxmail.com)
+ * Copyright (c) 2023 IotaHydrae(writeforever@foxmail.com)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -51,19 +50,11 @@
 
 #include "lvgl/lvgl.h"
 #include "lvgl/demos/lv_demos.h"
-
 #include "port/lv_port_disp.h"
-
-#include "src/widgets/lv_label.h"
-#include "ui/ui.h"
 
 /* Pins Define of rpi-pico
  *
  * The SPI interface using default spi0
- *
- * RES  <->  GP14
- * DC   <->  GP15
- * BUSY <->  GP20
  */
 #define EPINK_RES_PIN   15
 #define EPINK_DC_PIN    14
@@ -596,66 +587,6 @@ static void hal_init(void)
 #endif
 }
 
-static void lv_epink_update_cb(lv_timer_t * timer)
-{
-    LV_LOG_WARN("%s called", __func__);
-    epink_flush();
-}
-
-static void anim_y_cb(void *var, int32_t v)
-{
-    lv_obj_set_y(var, v);
-}
-
-extern lv_obj_t *ui_RollerHour;
-extern lv_obj_t *ui_RollerMinute;
-extern lv_obj_t *ui_RollerHour;
-extern lv_obj_t *ui_LabelTips;
-
-static uint8_t hour = 0;
-static uint8_t minute = 0;
-static uint8_t second = 0;
-static uint8_t tips_index = 0;
-
-static void lv_timer_roller_time_cb()
-{
-    lv_roller_set_selected(ui_RollerSecond, ++second, LV_ANIM_OFF);
-    
-    if (second == 60) {
-        second = 0;
-        lv_roller_set_selected(ui_RollerSecond, second, LV_ANIM_OFF);
-        lv_roller_set_selected(ui_RollerMinute, ++minute, LV_ANIM_OFF);
-    }
-
-    if (minute == 60) {
-        minute = 0;
-        lv_roller_set_selected(ui_RollerMinute, minute, LV_ANIM_OFF);
-        lv_roller_set_selected(ui_RollerHour, ++hour, LV_ANIM_OFF);
-    }
-
-    if (hour == 24) {
-        hour=0;
-        lv_roller_set_selected(ui_RollerHour, hour, LV_ANIM_OFF);
-    }
-
-}
-
-static const char *g_tips[] = {
-    "Learn to pause.",
-    "Don't Worry, Be Happy.",
-    "Gah! YEEEEEEEE!",
-    "Never laugh at live dragons.",
-    "You are not dead yet.",
-    "Cheers!",
-};
-
-static void lv_timer_label_tips_cb()
-{
-    lv_label_set_text(ui_LabelTips, g_tips[tips_index++]);
-    if (tips_index > (sizeof(g_tips)/sizeof(g_tips[0]) - 1))
-        tips_index = 0;
-}
-
 int main( void )
 {
     stdio_init_all();
@@ -692,44 +623,10 @@ int main( void )
     // sleep_ms(200);
 
     // lv_demo_widgets();
-    // lv_demo_stress();
-    // lv_demo_music();
-    ui_init();
-
-    lv_timer_t *timer_roller = lv_timer_create_basic();
-    timer_roller->timer_cb = lv_timer_roller_time_cb;
-    timer_roller->period = 1000;
-    
-    lv_label_set_long_mode(ui_LabelTips, LV_LABEL_LONG_WRAP);
-    
-    lv_timer_t *timer_tips = lv_timer_create_basic();
-    timer_tips->timer_cb = lv_timer_label_tips_cb;
-    timer_tips->period = 5000;
-
-    // lv_obj_t *btn = lv_btn_create(lv_scr_act());
-    // lv_obj_set_style_bg_color(btn, lv_color_hex(0x0), 0);
-    // lv_obj_set_style_radius(btn, 10, 0);
-    // lv_obj_set_style_border_width(btn, 3, 0);
-    // lv_obj_center(btn);
-
-    // LV_FONT_DECLARE(lv_font_montserrat_22);
-    // lv_obj_t *label = lv_label_create(btn);
-    // lv_label_set_text(label, "embeddedboys");
-    // lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
-
-    // lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 0);
-    // lv_anim_t a;
-    // lv_anim_init(&a);
-
-    // lv_anim_set_var(&a, btn);
-    // lv_anim_set_values(&a, lv_obj_get_y(btn), 150);
-    // lv_anim_set_time(&a, 1000);
-    // lv_anim_set_exec_cb(&a, anim_y_cb);
-    // lv_anim_set_path_cb(&a, lv_anim_path_bounce);
-    // lv_anim_start(&a);
+    lv_demo_stress();
 
     while( 1 ) {
-        sleep_us(5*1000);
+        sleep_us(5000);
         lv_timer_handler();
         lv_tick_inc(5);
     }
