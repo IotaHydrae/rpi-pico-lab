@@ -22,6 +22,7 @@ struct keypad_config default_cfg = {
     },
     .num_rows = 4,
     .num_cols = 4,
+    .scan_delay = 100,
 };
 int main()
 {
