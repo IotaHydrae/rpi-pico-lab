@@ -1,5 +1,6 @@
 # dirs
-.vscode
+.vscode/
+.cache/
 build/
 
 # Prerequisites
