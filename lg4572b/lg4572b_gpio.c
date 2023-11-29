@@ -71,7 +71,7 @@ struct lg4572b_priv {
     /* device specific */
     const struct lg4572b_operations  *tftops;
     struct lg4572b_display           *display;
-};
+} g_priv;
 
 static inline int dm_gpio_set_value(int *pin, int val)
 {
@@ -147,11 +147,11 @@ static int lg4572b_write_reg(struct lg4572b_priv *priv, int len, ...)
     int i;
     
     /* claim bus */
-    dm_gpio_set_value(&priv->gpio.cs, 0);
+    // dm_gpio_set_value(&priv->gpio.cs, 0);
     
     va_start(args, len);
     *buf = (u16)va_arg(args, unsigned int);
-    printf("cmd : 0x%x\n", *buf);
+    // printf("cmd : 0x%x\n", *buf);
     write_buf_rs(priv, buf, sizeof(u16), 0);
     len--;
     
@@ -159,20 +159,20 @@ static int lg4572b_write_reg(struct lg4572b_priv *priv, int len, ...)
     if (len == 0)
         return 0;
     
-    printf("data : \n");
+    // printf("data : \n");
     for (i = 0; i < len; i++) {
         *buf = (u16)va_arg(args, unsigned int);
-        printf("0x%x ", *buf);
+        // printf("0x%x ", *buf);
         buf++;
     }
-    printf("\n");
+    // printf("\n");
     
     len *= 2;
     write_buf_rs(priv, priv->buf, len, 1);
     va_end(args);
     
     /* release bus */
-    dm_gpio_set_value(&priv->gpio.cs, 1);
+    // dm_gpio_set_value(&priv->gpio.cs, 1);
     
     return 0;
 }
@@ -259,17 +259,21 @@ static int lg4572b_clear(struct lg4572b_priv *priv, u16 clear)
     u32 height = priv->display->yres;
     int x, y;
 
-    pr_debug("clearing screen with color 0x%x\n", clear);
-    
-    lg4572b_set_addr_win(priv, 0, 0,
+    pr_debug("clearing screen (%d x %d) with color 0x%x\n", width, height, clear);
+
+    priv->tftops->set_addr_win(priv, 0, 0,
                          priv->display->xres - 1,
                          priv->display->yres - 1);
-                         
+    
+    // dm_gpio_set_value(&priv->gpio.cs, 0);
     for (x = 0; x < width; x++) {
         for (y = 0; y < height; y++) {
             write_buf_rs(priv, &clear, sizeof(u16), 1);
         }
     }
+
+    // dm_gpio_set_value(&priv->gpio.cs, 1);
+
     return 0;
 }
 
@@ -292,6 +296,7 @@ static const struct lg4572b_operations default_lg4572b_ops = {
     .blank           = lg4572b_blank,
     .sleep           = lg4572b_sleep,
     .set_var         = lg4572b_set_var,
+    .set_addr_win    = lg4572b_set_addr_win,
 };
 
 #define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -329,8 +334,10 @@ static int lg4572b_hw_init(struct lg4572b_priv *priv)
 
     lg4572b_gpio_init(priv);
 
+    dm_gpio_set_value(&priv->gpio.cs, 0);
+
     priv->tftops->init_display(priv);
-    // priv->tftops->clear(priv, 0x1234);
+    priv->tftops->clear(priv, 0xffff);
     
     /* enable backlight after screen cleared */
     ret = dm_gpio_set_value(&priv->gpio.bl, 1);
@@ -355,7 +362,7 @@ static int lg4572b_video_sync(struct lg4572b_priv *priv)
     lg4572b_set_addr_win(priv, 0, 0,
                          priv->display->xres - 1,
                          priv->display->yres - 1);
-                         
+
     // pr_debug("uc_priv->xsize : %d, uc_priv->ysize : %d\n", uc_priv->xsize, uc_priv->ysize);
     // write_buf_rs(priv, vmem16, uc_priv->xsize * uc_priv->ysize * 2, 1);
     
@@ -377,7 +384,6 @@ static int lg4572b_probe(struct lg4572b_priv *priv)
     return 0;
 }
 
-static struct lg4572b_priv g_priv;
 int main()
 {
     stdio_uart_init_full(uart0, 115200, 16, 17);
