@@ -75,7 +75,9 @@ struct lg4572b_priv {
 
 static inline int dm_gpio_set_value(int *pin, int val)
 {
+    asm volatile("nop \n nop \n nop");
     gpio_put(*pin, val);
+    asm volatile("nop \n nop \n nop");
     return 0;
 }
 
@@ -182,11 +184,11 @@ static int lg4572b_write_reg(struct lg4572b_priv *priv, int len, ...)
 
 static int lg4572b_reset(struct lg4572b_priv *priv)
 {
-    dm_gpio_set_value(&priv->gpio.reset, 0);
-    mdelay(40);
     dm_gpio_set_value(&priv->gpio.reset, 1);
-    mdelay(120);
+    mdelay(40);
     dm_gpio_set_value(&priv->gpio.reset, 0);
+    mdelay(120);
+    dm_gpio_set_value(&priv->gpio.reset, 1);
     mdelay(40);
     return 0;
 }
@@ -337,7 +339,7 @@ static int lg4572b_hw_init(struct lg4572b_priv *priv)
     dm_gpio_set_value(&priv->gpio.cs, 0);
 
     priv->tftops->init_display(priv);
-    priv->tftops->clear(priv, 0xffff);
+    priv->tftops->clear(priv, 0x1234);
     
     /* enable backlight after screen cleared */
     ret = dm_gpio_set_value(&priv->gpio.bl, 1);
@@ -345,6 +347,8 @@ static int lg4572b_hw_init(struct lg4572b_priv *priv)
         pr_debug("failed to set backlight!\n");
         return ret;
     }
+
+    priv->tftops->clear(priv, 0x2345);
     
     return 0;
 }
