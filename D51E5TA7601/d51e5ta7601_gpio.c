@@ -529,6 +529,7 @@ static int d51e5ta7601_probe(struct d51e5ta7601_priv *priv)
     return 0;
 }
 
+#if 0
 int main()
 {
     stdio_uart_init_full(uart0, 115200, 16, 17);
@@ -541,3 +542,15 @@ int main()
         tight_loop_contents();
     }
 }
+#else
+int d51e5ta7601_driver_init(void)
+{
+    stdio_uart_init_full(uart0, 115200, 16, 17);
+
+    pr_debug("\n\n\n\nThis is a simple test driver for d51e5ta7601\n");
+
+    d51e5ta7601_probe(&g_priv);
+
+    return 0;
+}
+#endif
