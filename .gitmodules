@@ -4,3 +4,7 @@
 [submodule "ssd1306-lvgl/lvgl"]
 	path = ssd1306-lvgl/lvgl
 	url = https://github.com/lvgl/lvgl
+[submodule "lvgl"]
+	path = lvgl
+	url = https://github.com/lvgl/lvgl.git
+	branch = release/v8.3
