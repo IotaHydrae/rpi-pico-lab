@@ -16,8 +16,8 @@
  *      DEFINES
  *********************/
 
-#define MY_DISP_HOR_RES    480
-#define MY_DISP_VER_RES    320
+#define MY_DISP_HOR_RES    320
+#define MY_DISP_VER_RES    480
 
 
 /**********************
@@ -79,16 +79,18 @@ void lv_port_disp_init(void)
      *      and you only need to change the frame buffer's address.
      */
 
+#define MY_DISP_BUF_SIZE (MY_DISP_HOR_RES * 80)
+
     // /* Example for 1) */
     // static lv_disp_draw_buf_t draw_buf_dsc_1;
-    // static lv_color_t buf_1[MY_DISP_HOR_RES * 10];                          /*A buffer for 10 rows*/
-    // lv_disp_draw_buf_init(&draw_buf_dsc_1, buf_1, NULL, MY_DISP_HOR_RES * 10);   /*Initialize the display buffer*/
+    // static lv_color_t buf_1[MY_DISP_BUF_SIZE];                          /*A buffer for 10 rows*/
+    // lv_disp_draw_buf_init(&draw_buf_dsc_1, buf_1, NULL, MY_DISP_BUF_SIZE);   /*Initialize the display buffer*/
 
     // /* Example for 2) */
     static lv_disp_draw_buf_t draw_buf_dsc_2;
-    static lv_color_t buf_2_1[MY_DISP_HOR_RES * 10];                        /*A buffer for 10 rows*/
-    static lv_color_t buf_2_2[MY_DISP_HOR_RES * 10];                        /*An other buffer for 10 rows*/
-    lv_disp_draw_buf_init(&draw_buf_dsc_2, buf_2_1, buf_2_2, MY_DISP_HOR_RES * 10);   /*Initialize the display buffer*/
+    static lv_color_t buf_2_1[MY_DISP_BUF_SIZE];                        /*A buffer for 10 rows*/
+    static lv_color_t buf_2_2[MY_DISP_BUF_SIZE];                        /*An other buffer for 10 rows*/
+    lv_disp_draw_buf_init(&draw_buf_dsc_2, buf_2_1, buf_2_2, MY_DISP_BUF_SIZE);   /*Initialize the display buffer*/
 
     /* Example for 3) also set disp_drv.full_refresh = 1 below*/
     // static lv_disp_draw_buf_t draw_buf_dsc_3;
