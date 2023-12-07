@@ -85,7 +85,7 @@ static inline void mdelay(int val)
     sleep_ms(val);
 }
 
-#define DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
+// #define DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
 int fbtft_write_gpio16_wr(struct d51e5ta7601_priv *priv, void *buf, size_t len)
 {
     u16 data;
@@ -208,7 +208,7 @@ static int d51e5ta7601_init_display(struct d51e5ta7601_priv *priv)
     dm_gpio_set_value(&priv->gpio.rd, 1);
     mdelay(150);
 
-    write_reg(priv, 0x01, 0x003c);
+    write_reg(priv, 0x01, 0x013c);
     write_reg(priv, 0x02, 0x0100);
     write_reg(priv, 0x03, 0x1030);
     write_reg(priv, 0x08, 0x0808);
@@ -462,15 +462,18 @@ static struct d51e5ta7601_display default_d51e5ta7601_display = {
 static int d51e5ta7601_video_sync(struct d51e5ta7601_priv *priv, int xs, int ys, int xe, int ye, void *data, size_t len)
 {
     int i;
-    pr_debug("video sync: xs=%d, ys=%d, xe=%d, ye=%d, len=%d\n", xs, ys, xe, ye, len);
+    // pr_debug("video sync: xs=%d, ys=%d, xe=%d, ye=%d, len=%d\n", xs, ys, xe, ye, len);
 
-    priv->tftops->set_addr_win(priv, xs, ys, xe, ye);
+    // priv->tftops->set_addr_win(priv, xs, ys, xe, ye);
+    // priv->tftops->set_addr_win(priv, ys, xs, xe, ye);
+    // write_buf_rs(priv, data, len * 2, 1);
+    // return 0;
 
     int x, y;
     for (y = ys; y <= ye; y++) {
         for (x = xs; x <= xe; x++) {
-            priv->tftops->set_cursor(priv, x, y);
-            write_buf_rs(priv, data, sizeof(u16), 1);
+            priv->tftops->set_cursor(priv, y, x);
+            write_buf_rs(priv, data, sizeof(u16) * 2, 1);
             data+=2;
         }
     }
