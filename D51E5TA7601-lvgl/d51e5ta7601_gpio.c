@@ -356,10 +356,6 @@ static int d51e5ta7601_set_addr_win(struct d51e5ta7601_priv *priv, int xs, int y
     write_reg(priv, 0x47, ys);
     write_reg(priv, 0x46, ye);
 
-    write_reg(priv, 0x20, xs);
-    write_reg(priv, 0x21, ys);
-    
-    write_reg(priv, 0x22);
     return 0;
 }
 
@@ -461,23 +457,15 @@ static struct d51e5ta7601_display default_d51e5ta7601_display = {
 
 static int d51e5ta7601_video_sync(struct d51e5ta7601_priv *priv, int xs, int ys, int xe, int ye, void *data, size_t len)
 {
-    int i;
     // pr_debug("video sync: xs=%d, ys=%d, xe=%d, ye=%d, len=%d\n", xs, ys, xe, ye, len);
 
-    // priv->tftops->set_addr_win(priv, xs, ys, xe, ye);
-    // priv->tftops->set_addr_win(priv, ys, xs, xe, ye);
-    // write_buf_rs(priv, data, len * 2, 1);
-    // return 0;
+    priv->tftops->set_addr_win(priv, xs, ys, xe, ye);
 
-    int x, y;
-    for (y = ys; y <= ye; y++) {
-        for (x = xs; x <= xe; x++) {
-            priv->tftops->set_cursor(priv, y, x);
-            write_buf_rs(priv, data, sizeof(u16) * 2, 1);
-            data+=2;
-        }
+    priv->tftops->set_cursor(priv, ys, xs);
+    while (len--) {
+        write_buf_rs(priv, data, sizeof(u16), 1);
+        data+=2;
     }
-    
     return 0;
 }
 
