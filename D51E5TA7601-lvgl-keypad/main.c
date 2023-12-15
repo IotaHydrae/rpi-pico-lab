@@ -30,6 +30,9 @@
 
 #define CPU_SPEED_MHZ 240
 
+extern int pcf8574_driver_init(void);
+extern int pcf8574_driver_test(void);
+
 int main(void)
 {   
     vreg_set_voltage(VREG_VOLTAGE_1_05);
@@ -47,8 +50,11 @@ int main(void)
     lv_port_disp_init();
     lv_port_indev_init();
 
+    // pcf8574_driver_init();
+    // pcf8574_driver_test();
+
     printf("starting lvgl demo\n");
-    lv_demo_stress();
+    lv_demo_keypad_encoder();
 
     for (;;) {
         sleep_ms(5);

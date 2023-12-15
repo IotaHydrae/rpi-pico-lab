@@ -33,15 +33,11 @@ struct pcf8474_data {
     struct {
     uint8_t addr;
     i2c_inst_t *master;
-    int scl_pin;
-    int sda_pin;
+    uint8_t scl_pin;
+    uint8_t sda_pin;
 
-    uint32_t speed;
-    uint32_t min_speed_hz;
-    uint32_t max_speed_hz;
     } i2c;
 
-    int irq_pin;
 
     union {
         struct {
@@ -56,6 +52,8 @@ struct pcf8474_data {
         }pins;
         uint8_t all;
     } gpio;
+
+    uint8_t irq_pin;
 
 } g_pcf8474_data;
 
@@ -75,7 +73,7 @@ static inline uint8_t pcf8574_read_byte(struct pcf8474_data *priv)
     return rxdata;
 }
 
-static int pcf8574_gpio_put(struct pcf8474_data *priv, int pin, bool val)
+static int __pcf8574_gpio_put(struct pcf8474_data *priv, int pin, bool val)
 {
     if (pin < 0 || pin > 7) {
         printf("pcf8574_gpio_put: invalid pin %d\n", pin);
@@ -87,35 +85,62 @@ static int pcf8574_gpio_put(struct pcf8474_data *priv, int pin, bool val)
     else
         priv->gpio.all &= ~(1 << pin);
 
-    printf("gpio state: 0x%02x\n", priv->gpio.all);
+    // printf("gpio state: 0x%02x\n", priv->gpio.all);
     pcf8574_write_byte(priv, priv->gpio.all);
 
     return 0;
 }
 
-static int pcf8574_gpio_put_all(struct pcf8474_data *priv, uint8_t val)
+int pcf8574_gpio_put(int pin, bool val)
+{
+    return __pcf8574_gpio_put(&g_pcf8474_data, pin, val);
+}
+
+static int __pcf8574_gpio_put_all(struct pcf8474_data *priv, uint8_t val)
 {
     priv->gpio.all = val;
-    printf("gpio state: 0x%02x\n", priv->gpio.all);
+    // printf("gpio state: 0x%02x\n", priv->gpio.all);
     pcf8574_write_byte(priv, priv->gpio.all);
     return 0;
 }
 
-static int pcf8574_gpio_get(struct pcf8474_data *priv, int pin)
+int pcf8574_gpio_put_all(uint8_t val)
 {
-    return 0;
+    return __pcf8574_gpio_put_all(&g_pcf8474_data, val);
 }
 
-int pcf8574_get_key(void)
+static bool __pcf8574_gpio_get(struct pcf8474_data *priv, int pin)
 {
-    uint8_t rxdata;
-    i2c_read_blocking(g_pcf8474_data.i2c.master, g_pcf8474_data.i2c.addr, &rxdata, 1, false);
-    return rxdata;
+    if (pin < 0 || pin > 7) {
+        printf("pcf8574_gpio_get: invalid pin %d\n", pin);
+        return -1;
+    }
+    
+    priv->gpio.all = pcf8574_read_byte(priv);
+    // printf("pin state: 0x%02x\n", (priv->gpio.all >> pin) & 0x01);
+    return (priv->gpio.all >> pin) & 0x01;
+}
+
+bool pcf8574_gpio_get(int pin)
+{
+    return __pcf8574_gpio_get(&g_pcf8474_data, pin);
+}
+
+static uint8_t __pcf8574_gpio_get_all(struct pcf8474_data *priv)
+{
+    priv->gpio.all = pcf8574_read_byte(priv);
+    // printf("gpio state: 0x%02x\n", priv->gpio.all);
+    return priv->gpio.all;
+}
+
+uint8_t pcf8574_gpio_get_all(void)
+{
+    return __pcf8574_gpio_get_all(&g_pcf8474_data);
 }
 
 static int pcf8574_hw_init(struct pcf8474_data *priv)
 {
-    i2c_init(priv->i2c.master, priv->i2c.speed);
+    i2c_init(priv->i2c.master, 100000);
     gpio_set_function(priv->i2c.scl_pin, GPIO_FUNC_I2C);
     gpio_set_function(priv->i2c.sda_pin, GPIO_FUNC_I2C);
 
@@ -126,6 +151,8 @@ static int pcf8574_hw_init(struct pcf8474_data *priv)
     gpio_pull_up(priv->irq_pin);
 
     i2c_bus_scan(priv->i2c.master);
+
+    __pcf8574_gpio_put_all(priv, priv->gpio.all);
 }
 
 static int pcf8574_probe(struct pcf8474_data *priv)
@@ -134,14 +161,13 @@ static int pcf8574_probe(struct pcf8474_data *priv)
     priv->i2c.addr    = PCF8574_ADDR;
     priv->i2c.scl_pin = 27;
     priv->i2c.sda_pin = 26;
-    priv->i2c.speed   = 400000;
 
     priv->irq_pin = 22;
 
+    priv->gpio.all = 0xff;
+
     pcf8574_hw_init(priv);
 
-    // pcf8574_gpio_put(priv, 0, 1);
-    pcf8574_gpio_put_all(priv, 0xaa);
     return 0;
 }
 
@@ -150,4 +176,9 @@ int pcf8574_driver_init(void)
     printf("pcf8574_driver_init\n");
     pcf8574_probe(&g_pcf8474_data);
     return 0;
+}
+
+int pcf8574_driver_test(void)
+{
+    // pcf8574_gpio_put(7, 1);
 }

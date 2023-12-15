@@ -16,7 +16,7 @@ add_subdirectory(lvgl)
 # rest of your project
 if (DISP_OVER_PIO)
 	add_executable(d51e5ta7601_gpio main.c
-        d51e5ta7601_pio.c ns2009.c pcf8574.c i2c_tools.c
+        d51e5ta7601_pio.c ns2009.c pcf8574.c i2c_tools.c keypad.c
         porting/lv_port_disp_template.c
 		porting/lv_port_indev_template.c
 		pio/i80.c)
@@ -25,7 +25,7 @@ if (DISP_OVER_PIO)
 				hardware_pwm hardware_pio hardware_dma hardware_i2c)
 else(DISP_OVER_PIO)
 	add_executable(d51e5ta7601_gpio main.c
-        d51e5ta7601_gpio.c ns2009.c pcf8574.c i2c_tools.c
+        d51e5ta7601_gpio.c ns2009.c pcf8574.c i2c_tools.c keypad.c
         porting/lv_port_disp_template.c
 		porting/lv_port_indev_template.c)
 	target_link_libraries(d51e5ta7601_gpio lvgl lvgl_demos pico_stdlib

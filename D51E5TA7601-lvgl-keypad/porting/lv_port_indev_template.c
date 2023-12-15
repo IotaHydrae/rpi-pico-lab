@@ -11,6 +11,8 @@
  *********************/
 #include "lv_port_indev_template.h"
 #include "lvgl.h"
+#include <stdio.h>
+#include "keypad.h"
 
 /*********************
  *      DEFINES
@@ -267,12 +269,24 @@ static void mouse_get_xy(lv_coord_t * x, lv_coord_t * y)
 /*------------------
  * Keypad
  * -----------------*/
-extern int pcf8574_driver_init(void);
+const struct keyboard_config default_keyboard = {
+    .col_pins = {3, 2, 1, 0},
+    .row_pins = {7, 6, 5, 4},
+    .map = {
+        '7', '8', '9', 'A',
+        '4', '5', '6', 'B',
+        '1', '2', '3', 'C',
+        '*', '0', '#', 'C',
+    },
+    .num_rows = 4,
+    .num_cols = 4,
+};
+
 /*Initialize your keypad*/
 static void keypad_init(void)
 {
     /*Your code comes here*/
-    pcf8574_driver_init();
+    keyboard_init(&default_keyboard);
 }
 
 /*Will be called by the library to read the mouse*/
@@ -287,6 +301,7 @@ static void keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     uint32_t act_key = keypad_get_key();
     if(act_key != 0) {
         data->state = LV_INDEV_STATE_PR;
+        printf("keypad_read: %c\n", act_key);
 
         /*Translate the keys to LVGL control characters according to your key definitions*/
         switch(act_key) {
@@ -320,8 +335,7 @@ static void keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 static uint32_t keypad_get_key(void)
 {
     /*Your code comes here*/
-
-    return 0;
+    return keyboard_get_key(&default_keyboard);
 }
 
 /*------------------
