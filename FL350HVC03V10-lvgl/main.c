@@ -19,19 +19,20 @@
 
 #include "lvgl/lvgl.h"
 #include "lvgl/demos/lv_demos.h"
+#include "lvgl/examples/lv_examples.h"
 #include "pico/time.h"
 #include "porting/lv_port_disp_template.h"
 
 extern int i80_pio_init(void);
 
-// bool lv_tick_timer_callback(struct repeating_timer *t)
-// {
-//     lv_tick_inc(5);
-//     lv_timer_handler();
-//     return true;
-// }
+bool lv_tick_timer_callback(struct repeating_timer *t)
+{
+    lv_tick_inc(5);
+    lv_timer_handler();
+    return true;
+}
 
-#define CPU_SPEED_MHZ 125
+#define CPU_SPEED_MHZ 120
 
 int main(void)
 {
@@ -46,23 +47,22 @@ int main(void)
     stdio_uart_init_full(uart0, 115200, 16, 17);
     printf("\n\n\nfl350hvc03v10 LVGL Porting\n");
 
+    i80_pio_init();
+
     lv_init();
     lv_port_disp_init();
 
     printf("Starting demo\n");
-    lv_demo_widgets();
+    // lv_demo_widgets();
     // lv_demo_stress();
-    // lv_demo_music();
+    lv_demo_music();
     // lv_demo_benchmark();
     
-    // struct repeating_timer timer;
-    // add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
+    struct repeating_timer timer;
+    add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
 
     for (;;) {
-        // tight_loop_contents();
-        lv_task_handler();
-        lv_tick_inc(5);
-        sleep_ms(5);
+        tight_loop_contents();
     }
 
     return 0;
