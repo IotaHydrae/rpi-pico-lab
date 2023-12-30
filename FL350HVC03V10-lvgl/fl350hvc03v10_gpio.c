@@ -193,7 +193,6 @@ static int fl350hvc03v10_reset(struct fl350hvc03v10_priv *priv)
     return 0;
 }
 
-
 static int fl350hvc03v10_set_var(struct fl350hvc03v10_priv *priv)
 {
     pr_debug("%s\n", __func__);
@@ -236,6 +235,7 @@ static int fl350hvc03v10_init_display(struct fl350hvc03v10_priv *priv)
 
     write_reg(priv, 0xF7, 0x80);
 
+    write_reg(priv, 0x36, (1 << 3) | (1 << 1));
     write_reg(priv, 0x3A, 0x55);
 
     write_reg(priv, 0x2A, 0x00, 0x00, 0x01, 0x3F);
