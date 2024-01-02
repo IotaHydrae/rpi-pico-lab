@@ -79,7 +79,7 @@ void lv_port_disp_init(void)
      *      and you only need to change the frame buffer's address.
      */
 
-#define MY_DISP_BUF_SIZE    (MY_DISP_HOR_RES * 120)
+#define MY_DISP_BUF_SIZE    (MY_DISP_HOR_RES * 100)
 
     /* Example for 1) */
     // static lv_disp_draw_buf_t draw_buf_dsc_1;

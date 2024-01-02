@@ -83,12 +83,10 @@ static inline void mdelay(int val)
     sleep_ms(val);
 }
 
-extern void i80_set_rs_cs(bool rs, bool cs);
 extern int i80_write_buf_rs(void *buf, size_t len, bool rs);
 /* rs=0 means writing register, rs=1 means writing data */
 static int write_buf_rs(struct lg4572b_priv *priv, void *buf, size_t len, int rs)
 {
-    i80_set_rs_cs(rs, 0);
     i80_write_buf_rs(buf, len, rs);
     return 0;
 }
@@ -185,7 +183,7 @@ static int lg4572b_init_display(struct lg4572b_priv *priv)
 static int lg4572b_set_addr_win(struct lg4572b_priv *priv, int xs, int ys, int xe,
                                 int ye)
 {
-    /* set column adddress */
+    /* set column address */
     write_reg(priv, 0x2A, xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
     
     /* set row address */

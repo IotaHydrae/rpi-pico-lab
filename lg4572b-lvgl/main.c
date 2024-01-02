@@ -24,18 +24,20 @@
 
 extern int i80_pio_init(void);
 
-// bool lv_tick_timer_callback(struct repeating_timer *t)
-// {
-//     lv_tick_inc(5);
-//     lv_timer_handler();
-//     return true;
-// }
+bool lv_tick_timer_callback(struct repeating_timer *t)
+{
+    lv_timer_handler();
+    return true;
+}
 
-#define CPU_SPEED_MHZ 125
+#define PICO_FLASH_SPI_CLKDIV 2
+// #define CPU_SPEED_MHZ 125
+#define CPU_SPEED_MHZ 280
 
 int main(void)
 {
-    vreg_set_voltage(VREG_VOLTAGE_0_90);
+    // vreg_set_voltage(VREG_VOLTAGE_0_90);
+    vreg_set_voltage(VREG_VOLTAGE_1_10);
     set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
     clock_configure(clk_peri,
                     0,
@@ -44,7 +46,7 @@ int main(void)
                     CPU_SPEED_MHZ * MHZ);
 
     stdio_uart_init_full(uart0, 115200, 16, 17);
-    printf("\n\n\n\nD51E5TA7601 LVGL Porting\n");
+    printf("\n\n\nLG4572B LVGL Porting\n");
 
     i80_pio_init();
 
@@ -53,16 +55,14 @@ int main(void)
 
     printf("Starting demo\n");
     lv_demo_stress();
-
-    // struct repeating_timer timer;
-    // add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
-
+    // lv_demo_music();
+    // lv_demo_benchmark();
+    
+    struct repeating_timer timer;
+    add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
 
     for (;;) {
-        // tight_loop_contents();
-        sleep_ms(5);
-        lv_task_handler();
-        lv_tick_inc(5);
+        tight_loop_contents();
     }
 
     return 0;
