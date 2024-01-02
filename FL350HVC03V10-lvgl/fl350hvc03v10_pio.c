@@ -182,7 +182,8 @@ static int fl350hvc03v10_init_display(struct fl350hvc03v10_priv *priv)
 
     write_reg(priv, 0xF7, 0x80);
 
-    write_reg(priv, 0x36, (1 << 3) | (1 << 1));
+    // write_reg(priv, 0x36, (1 << 5) | (1 << 7) | (1 << 3) | (1 << 1));
+    write_reg(priv, 0x36, 0x28 | (1 << 0) | (1 << 1));
     write_reg(priv, 0x3A, 0x55);
 
     write_reg(priv, 0x2A, 0x00, 0x00, 0x01, 0x3F);

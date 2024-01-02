@@ -16,8 +16,8 @@
  *      DEFINES
  *********************/
 
-#define MY_DISP_HOR_RES    320
-#define MY_DISP_VER_RES    480
+#define MY_DISP_HOR_RES    480
+#define MY_DISP_VER_RES    320
 
 /**********************
  *      TYPEDEFS
@@ -79,7 +79,7 @@ void lv_port_disp_init(void)
      *      and you only need to change the frame buffer's address.
      */
 
-#define MY_DISP_BUF_SIZE    (MY_DISP_HOR_RES * 280)
+#define MY_DISP_BUF_SIZE    (MY_DISP_HOR_RES * 200)
 
     /* Example for 1) */
     static lv_disp_draw_buf_t draw_buf_dsc_1;
