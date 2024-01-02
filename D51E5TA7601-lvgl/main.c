@@ -20,18 +20,18 @@
 #include "lvgl/demos/lv_demos.h"
 #include "porting/lv_port_disp_template.h"
 
-// bool lv_tick_timer_callback(struct repeating_timer *t)
-// {
-//     lv_tick_inc(5);
-//     lv_timer_handler();
-//     return true;
-// }
+bool lv_tick_timer_callback(struct repeating_timer *t)
+{
+    lv_timer_handler();
+    return true;
+}
 
+#define PICO_FLASH_SPI_CLKDIV 2
 #define CPU_SPEED_MHZ 240
 
 int main(void)
 {   
-    vreg_set_voltage(VREG_VOLTAGE_1_05);
+    vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
     set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
     clock_configure(clk_peri,
                     0,
@@ -46,11 +46,16 @@ int main(void)
     lv_port_disp_init();
 
     printf("starting lvgl demo\n");
-    lv_demo_benchmark();
+    lv_demo_stress();
+    // lv_demo_music();
+    // lv_demo_benchmark();
+
+    struct repeating_timer timer;
+    add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
 
     for (;;) {
-        sleep_ms(5);
-        lv_timer_handler();
-        lv_tick_inc(5);
+        tight_loop_contents();
     }
+
+    return 0;
 }

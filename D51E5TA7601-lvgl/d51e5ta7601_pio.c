@@ -75,6 +75,8 @@ struct d51e5ta7601_priv {
     struct d51e5ta7601_display           *display;
 } g_priv;
 
+static u8 g_brounce_buf[64];
+
 static inline void dm_gpio_set_value(int *pin, int val)
 {
     gpio_put(*pin, val);
@@ -87,13 +89,13 @@ static inline void mdelay(int val)
 
 extern int i80_write_buf_rs(void *buf, size_t len, bool rs);
 /* rs=0 means writing register, rs=1 means writing data */
-static int write_buf_rs(struct d51e5ta7601_priv *priv, void *buf, size_t len, int rs)
+static inline int write_buf_rs(struct d51e5ta7601_priv *priv, void *buf, size_t len, int rs)
 {
     i80_write_buf_rs(buf, len, rs);
     return 0;
 }
 
-static int d51e5ta7601_write_reg(struct d51e5ta7601_priv *priv, int len, ...)
+static inline int d51e5ta7601_write_reg(struct d51e5ta7601_priv *priv, int len, ...)
 {
     u16 *buf = (u16 *)priv->buf;
     va_list args;
@@ -437,13 +439,12 @@ int d51e5ta7601_video_flush(int xs, int ys, int xe, int ye, void *data, size_t l
     return 0;
 }
 
-#define PAGE_SIZE (1 << 12)
 extern int i80_pio_init(void);
 static int d51e5ta7601_probe(struct d51e5ta7601_priv *priv)
 {
     pr_debug("d51e5ta7601 probing ...\n");
     
-    priv->buf = (u8 *)malloc(PAGE_SIZE);
+    priv->buf = g_brounce_buf;
     
     priv->display = &default_d51e5ta7601_display;
     priv->tftops = &default_d51e5ta7601_ops;
@@ -461,7 +462,6 @@ static int d51e5ta7601_probe(struct d51e5ta7601_priv *priv)
     i80_pio_init();
 
     d51e5ta7601_hw_init(priv);
-    sleep_ms(500);
 
     return 0;
 }
