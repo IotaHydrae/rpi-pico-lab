@@ -75,81 +75,26 @@ struct fl350hvc03v10_priv {
     struct fl350hvc03v10_display           *display;
 } g_priv;
 
+static u8 g_brounce_buf[64];
+
 static inline void dm_gpio_set_value(int *pin, int val)
 {
     gpio_put(*pin, val);
 }
 
+#if 0
 static inline void mdelay(int val)
 {
     sleep_ms(val);
 }
-
-// #define DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
-int fbtft_write_gpio16_wr(struct fl350hvc03v10_priv *priv, void *buf, size_t len)
-{
-    u16 data;
-    int i;
-#ifndef DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
-    static u16 prev_data;
-#endif
-
-    /* claim bus */
-    dm_gpio_set_value(&priv->gpio.cs, 0);
-
-    /* Start writing by pulling down /WR */
-    dm_gpio_set_value(&priv->gpio.wr, 1);
-
-    while (len) {
-        data = *(u16 *)buf;
-        
-        /* Start writing by pulling down /WR */
-        dm_gpio_set_value(&priv->gpio.wr, 0);
-
-        // printf("data : 0x%x\n", data);
-        
-        /* Set data */
-#ifndef DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
-        if (data == prev_data) {
-            dm_gpio_set_value(&priv->gpio.wr, 1); /* used as delay */
-        } else {
-            for (i = 0; i < 16; i++) {
-                if ((data & 1) != (prev_data & 1))
-                    dm_gpio_set_value(&priv->gpio.db[i],
-                                      data & 1);
-                data >>= 1;
-                prev_data >>= 1;
-            }
-        }
 #else
-        for (i = 0; i < 16; i++) {
-            dm_gpio_set_value(&priv->gpio.db[i], data & 1);
-            data >>= 1;
-        }
+#define mdelay(v) sleep_ms(v)
 #endif
-        
-        /* Pullup /WR */
-        dm_gpio_set_value(&priv->gpio.wr, 1);
-        
-#ifndef DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
-        prev_data = *(u16 *)buf;
-#endif
-        buf += 2;
-        len -= 2;
-    }
 
-    /* release bus */
-    dm_gpio_set_value(&priv->gpio.cs, 1);
-    
-    return 0;
-}
-
-extern void i80_set_rs_cs(bool rs, bool cs);
 extern int i80_write_buf_rs(void *buf, size_t len, bool rs);
 /* rs=0 means writing register, rs=1 means writing data */
-static int write_buf_rs(struct fl350hvc03v10_priv *priv, void *buf, size_t len, int rs)
+static inline int write_buf_rs(struct fl350hvc03v10_priv *priv, void *buf, size_t len, int rs)
 {
-    i80_set_rs_cs(rs, 0);
     i80_write_buf_rs(buf, len, rs);
     return 0;
 }
@@ -255,7 +200,7 @@ static int fl350hvc03v10_init_display(struct fl350hvc03v10_priv *priv)
 static int fl350hvc03v10_set_addr_win(struct fl350hvc03v10_priv *priv, int xs, int ys, int xe,
                                 int ye)
 {
-    /* set column adddress */
+    /* set column address */
     write_reg(priv, 0x2A, xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
     
     /* set row address */
@@ -371,12 +316,11 @@ int fl350hvc03v10_video_flush(int xs, int ys, int xe, int ye, void *data, size_t
     return 0;
 }
 
-#define PAGE_SIZE 256
 static int fl350hvc03v10_probe(struct fl350hvc03v10_priv *priv)
 {
     pr_debug("fl350hvc03v10 probing ...\n");
     
-    priv->buf = (u8 *)malloc(PAGE_SIZE);
+    priv->buf = g_brounce_buf;
     
     priv->display = &default_fl350hvc03v10_display;
     priv->tftops = &default_fl350hvc03v10_ops;
