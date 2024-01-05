@@ -154,13 +154,13 @@ static int ili9488_init_display(struct ili9488_priv *priv)
 
     write_reg(priv, 0xc1, 0x41);
 
-    write_reg(priv, 0xc5, 0x00, 0x0a, 0x80);
+    write_reg(priv, 0xc5, 0x00, 0x28, 0x80);
 
     write_reg(priv, 0xb1, 0xb0, 0x11);
 
     write_reg(priv, 0xb4, 0x02);
 
-    write_reg(priv, 0xb6, 0x02, 0x42);
+    write_reg(priv, 0xb6, 0x02, 0x22);
 
     write_reg(priv, 0xb7, 0xc6);
 
@@ -168,7 +168,7 @@ static int ili9488_init_display(struct ili9488_priv *priv)
 
     write_reg(priv, 0xe9, 0x00);
 
-    write_reg(priv, 0x36, 0x8 | (1 << 5) | (1 << 7));
+    write_reg(priv, 0x36, 0x8 | (1 << 5) | (1 << 6));
 
     write_reg(priv, 0x3a, 0x55);
 
@@ -177,9 +177,8 @@ static int ili9488_init_display(struct ili9488_priv *priv)
     write_reg(priv, 0xe1, 0x00, 0x17, 0x1a, 0x04, 0x0e, 0x06, 0x2f, 0x45, 0x43, 0x02, 0x0a, 0x09, 0x32, 0x36, 0x0f);
 
     write_reg(priv, 0x11);
-    mdelay(50);
+    mdelay(120);
     write_reg(priv, 0x29);
-    mdelay(200);
 
     return 0;
 }

@@ -54,9 +54,9 @@ int main(void)
 
     printf("Starting demo\n");
     // lv_demo_widgets();
-    // lv_demo_stress();
+    lv_demo_stress();
     // lv_demo_music();
-    lv_demo_benchmark();
+    // lv_demo_benchmark();
     
     struct repeating_timer timer;
     add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
