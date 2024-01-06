@@ -11,7 +11,14 @@ project(d51e5ta7601_gpio)
 pico_sdk_init()
 
 include_directories(PUBLIC .)
-add_subdirectory(lvgl)
+# add_subdirectory(lvgl)
+
+file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
+                            "lvgl/demos/widgets/*.c"
+                            "lvgl/demos/stress/*.c"
+                            "lvgl/demos/benchmark/*.c"
+                            "lvgl/demos/music/*.c"
+                            "lvgl/demos/keypad_encoder/*.c")
 
 # rest of your project
 if (DISP_OVER_PIO)
@@ -19,10 +26,10 @@ if (DISP_OVER_PIO)
         d51e5ta7601_pio.c ns2009.c pcf8574.c i2c_tools.c keypad.c
         porting/lv_port_disp_template.c
 		porting/lv_port_indev_template.c
-		pio/i80.c)
+		pio/i80.c ${SOURCES})
 	pico_generate_pio_header(d51e5ta7601_gpio ${CMAKE_CURRENT_LIST_DIR}/pio/i80.pio)
-    target_link_libraries(d51e5ta7601_gpio lvgl lvgl_demos pico_stdlib
-				hardware_pwm hardware_pio hardware_dma hardware_i2c)
+    target_link_libraries(d51e5ta7601_gpio pico_stdlib
+				hardware_pwm hardware_pio hardware_dma hardware_i2c hardware_timer)
 else(DISP_OVER_PIO)
 	add_executable(d51e5ta7601_gpio main.c
         d51e5ta7601_gpio.c ns2009.c pcf8574.c i2c_tools.c keypad.c

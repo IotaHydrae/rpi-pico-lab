@@ -463,7 +463,7 @@ static int d51e5ta7601_probe(struct d51e5ta7601_priv *priv)
     i80_pio_init();
 
     d51e5ta7601_hw_init(priv);
-    sleep_ms(500);
+    // sleep_ms(500);
 
     return 0;
 }

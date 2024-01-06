@@ -10,7 +10,7 @@
  *      INCLUDES
  *********************/
 #include "lv_port_indev_template.h"
-#include "lvgl.h"
+#include "../lvgl/lvgl.h"
 #include <stdio.h>
 #include "keypad.h"
 
