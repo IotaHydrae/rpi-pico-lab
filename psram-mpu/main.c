@@ -28,7 +28,55 @@ void __attribute__((used)) faultHandlerWithExcFrame(uint32_t* push, uint32_t *re
 	while(1);
 }
 
-void __attribute__((__section__(".data"))) isr_hardfault(void)
+#define PSRAM_ADDR_START 0x2F000000
+unsigned char fake_memory[16];
+
+void hard_fault_handler_c(uint32_t *push, uint32_t *regs, uint32_t ret_lr)
+{
+    /*
+     * The exception frame were saved onto "push" pointer 32 byte
+     * 
+     */
+    uint32_t *sp = push;
+    unsigned i;
+
+    printf("============ HARD FAULT ============\n");
+	printf("R0  = 0x%08X    R8  = 0x%08X\n", (unsigned)push[0], (unsigned)regs[0]);
+	printf("R1  = 0x%08X    R9  = 0x%08X\n", (unsigned)push[1], (unsigned)regs[1]);
+	printf("R2  = 0x%08X    R10 = 0x%08X\n", (unsigned)push[2], (unsigned)regs[2]);
+	printf("R3  = 0x%08X    R11 = 0x%08X\n", (unsigned)push[3], (unsigned)regs[3]);
+	printf("R4  = 0x%08X    R12 = 0x%08X\n", (unsigned)regs[4], (unsigned)push[4]);
+	printf("R5  = 0x%08X    SP  = 0x%08X\n", (unsigned)regs[5], (unsigned)sp);
+	printf("R6  = 0x%08X    LR  = 0x%08X\n", (unsigned)regs[6], (unsigned)push[5]);
+	printf("R7  = 0x%08X    PC  = 0x%08X\n", (unsigned)regs[7], (unsigned)push[6]);
+	printf("RA  = 0x%08X    SR  = 0x%08X\n", (unsigned)ret_lr,  (unsigned)push[7]);
+
+    unsigned val = (unsigned)push[2];
+    unsigned addr = (unsigned)push[3];
+
+    printf("write 0x%08x to 0x%08x\n", val, addr);
+
+    printf("------ dump fake memory (cut here) ------\n");
+    for (i = 0; i < 16; i++) {
+        printf("addr: 0x%08x, val: 0x%08x\n", i + PSRAM_ADDR_START, fake_memory[i]);
+    }
+    printf("------ dump fake memory ------\n");
+
+    printf("performing a actual psram write operation.\n");
+    unsigned offset = addr - PSRAM_ADDR_START;
+    unsigned char *p = fake_memory;
+    p[offset] = val;
+
+    printf("------ dump fake memory (cut here) ------\n");
+    for (i = 0; i < 16; i++) {
+        printf("addr: 0x%08x, val: 0x%08x\n", i + PSRAM_ADDR_START, fake_memory[i]);
+    }
+    printf("------ dump fake memory ------\n");
+
+    while(1);
+}
+
+void isr_hardfault(void)
 {
     asm volatile(
         ".syntax unified    \n\t"
@@ -36,14 +84,14 @@ void __attribute__((__section__(".data"))) isr_hardfault(void)
         ".func HardFault_Handler \n\t"
         ".type HardFault_Handler function \n\t"
         "HardFault_Handler: \n\t"
-        // "   mov r0, lr \n\t"
-        // "   lsrs r0, #3 \n\t"
-        // "   bcs 1f  \n\t"
+        "   mov r0, lr \n\t"
+        "   lsrs r0, #3 \n\t"
+        "   bcs 1f  \n\t"
 		"	mov   r0, sp									\n\t"
-		// "	b     2f										\n\t"
-		// "1:													\n\t"
-		// "	mrs   r0, psp									\n\t"
-		// "2:													\n\t"
+		"	b     2f										\n\t"
+		"1:													\n\t"
+		"	mrs   r0, psp									\n\t"
+		"2:													\n\t"
 		
 		//to emulate-for-write fast, we must assume that PC points somewhere valid
 		//otherwise we'd have to take the penalty of switching to out safe mode, and then wrangling the MPU
@@ -53,10 +101,30 @@ void __attribute__((__section__(".data"))) isr_hardfault(void)
 		// "	ldrh	r1, [r2]								\n\t"
 		// "	lsrs	r3, r1, #8								\n\t"
 		// "	add		pc, r3									\n\t"
-		"	nop												\n\t"
-		".rept 35											\n\t"
-		"	b		report_some_fault						\n\t"
-        ".endr                                              \n\t"
+		// "	nop												\n\t"
+        "   b      call_handler                             \n\t"
+		// ".rept 35											\n\t"
+		// "	b		report_some_fault						\n\t"
+        // ".endr                                              \n\t"
+        "call_handler:                                      \n\t"
+        "	mov		r12, r0									\n\t"
+		"	mov		r0, r8									\n\t"
+		"	mov		r1, r9									\n\t"
+		"	mov		r2, r10									\n\t"
+		"	mov		r3, r11									\n\t"
+		"	push	{r0-r7}									\n\t"
+		"	mov		r0, r12									\n\t"
+		"	mov		r1, sp									\n\t"
+		"	mov		r2, lr									\n\t"
+        "   ldr     r3, =hard_fault_handler_c               \n\t"
+        "   bx      r3                                      \n\t"
+        "   ldmia"
+        "   ldr     r3, =#0xFFFFFFF9                        \n\t"
+        "   bx      r3                                      \n\t"
+        "report_some_fault_pop_r4lr:                        \n\t"
+        "   pop     {r4}                                    \n\t"
+        "   pop     {r3}                                    \n\t"
+        "   mov     lr, r3                                  \n\t"
         "report_some_fault:									\n\t"
 		"	mov		r12, r0									\n\t"
 		"	mov		r0, r8									\n\t"
@@ -77,14 +145,11 @@ void __attribute__((__section__(".data"))) isr_hardfault(void)
     return;
 }
 
-int __attribute__((used)) foo(unsigned addr, unsigned char val)
+void __attribute__((used)) write_vmem(unsigned addr, unsigned char val)
 {
-    volatile int *p = (volatile int *)0x2f000020;
-
-    printf("writing 0x%02x to addr : 0x%08x\n", val, addr);
-    *p = val;
+    volatile unsigned int *p = (volatile unsigned int *)addr;
     /* This will trigger Hard Fault */
-    return *p;
+    *p = val;
 }
 
 int main()
@@ -128,7 +193,9 @@ int main()
     // *p = 0x12345678;
 
     /* read data from flash via SSI */
-    foo(0x2f000020, 0x77);
+    write_vmem(0x2f000004, 0x77);
+
+    printf("hello, i'm back!\n");
     // printf("0x%x\n", *p);
     // int dump_len = 8;
     // while (dump_len--) {
