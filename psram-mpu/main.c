@@ -50,7 +50,7 @@ void hard_fault_handler_c(uint32_t *push, uint32_t *regs, uint32_t ret_lr)
 	printf("R6  = 0x%08X    LR  = 0x%08X\n", (unsigned)regs[6], (unsigned)push[5]);
 	printf("R7  = 0x%08X    PC  = 0x%08X\n", (unsigned)regs[7], (unsigned)push[6]);
 	printf("RA  = 0x%08X    SR  = 0x%08X\n", (unsigned)ret_lr,  (unsigned)push[7]);
-
+#if 0
     unsigned val = (unsigned)push[2];
     unsigned addr = (unsigned)push[3];
 
@@ -73,7 +73,12 @@ void hard_fault_handler_c(uint32_t *push, uint32_t *regs, uint32_t ret_lr)
     }
     printf("------ dump fake memory ------\n");
 
-    while(1);
+    // while(1);
+#endif
+    sp[6]+=2;
+    printf("PC  = 0x%08X\n", sp[6]);
+    // while(1);
+    printf("exiting from handler...\n");
 }
 
 void isr_hardfault(void)
@@ -102,6 +107,7 @@ void isr_hardfault(void)
 		// "	lsrs	r3, r1, #8								\n\t"
 		// "	add		pc, r3									\n\t"
 		// "	nop												\n\t"
+        "   push     {r4, lr}                               \n\t"
         "   b      call_handler                             \n\t"
 		// ".rept 35											\n\t"
 		// "	b		report_some_fault						\n\t"
@@ -117,10 +123,18 @@ void isr_hardfault(void)
 		"	mov		r1, sp									\n\t"
 		"	mov		r2, lr									\n\t"
         "   ldr     r3, =hard_fault_handler_c               \n\t"
-        "   bx      r3                                      \n\t"
-        "   ldmia"
-        "   ldr     r3, =#0xFFFFFFF9                        \n\t"
-        "   bx      r3                                      \n\t"
+        "   blx      r3                                      \n\t"
+
+        "   pop     {r0-r7}                                 \n\t"
+		"	mov		r8,  r0									\n\t"
+		"	mov		r9,  r1									\n\t"
+		"	mov		r10, r2									\n\t"
+		"	mov		r11, r3 								\n\t"
+
+        "   pop     {r4}                                    \n\t"
+        "   pop     {r3}                                    \n\t"
+        "   mov     lr, r3                                  \n\t"
+        "   bx      lr                                      \n\t"
         "report_some_fault_pop_r4lr:                        \n\t"
         "   pop     {r4}                                    \n\t"
         "   pop     {r3}                                    \n\t"
