@@ -1,0 +1,52 @@
+;
+; Copyright (c) 2023 embeddedboys Ltd.
+;
+; SPDX-License-Identifier: MIT
+;
+
+.program i80
+.side_set 1
+
+.wrap_target
+    out pins, 16    side 0
+    nop             side 1
+.wrap
+
+% c-sdk {
+
+static inline void i80_program_init(PIO pio, uint sm, uint offset, uint data_pin_base, uint pin_count, uint clk_pin, float clk_div) {
+    printf("%s, clk_div : %f\n", __func__, clk_div);
+    for (int i = 0; i < pin_count; i++) {
+        pio_gpio_init(pio, (data_pin_base + i));
+    }
+    
+    pio_gpio_init(pio, clk_pin);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, data_pin_base, 16, true);
+    pio_sm_set_consecutive_pindirs(pio, sm, clk_pin, 1, true);
+
+    pio_sm_config c = i80_program_get_default_config(offset);
+    sm_config_set_sideset_pins(&c, clk_pin);
+    sm_config_set_out_pins(&c, data_pin_base, 16);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    sm_config_set_clkdiv(&c, clk_div);
+    sm_config_set_out_shift(&c, false, true, 16);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+static inline void i80_put(PIO pio, uint sm, uint16_t x) {
+    while (pio_sm_is_tx_fifo_full(pio, sm))
+        ;
+    *(volatile uint16_t*)&pio->txf[sm] = x;
+}
+
+static inline void i80_wait_idle(PIO pio, uint sm) {
+    uint32_t sm_stall_mask = 1u << (sm + PIO_FDEBUG_TXSTALL_LSB);
+    pio->fdebug = sm_stall_mask;
+    while (!(pio->fdebug & sm_stall_mask))
+        ;
+}
+
+%}
