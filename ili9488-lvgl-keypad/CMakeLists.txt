@@ -18,6 +18,8 @@ file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
                             "lvgl/demos/keypad_encoder/*.c")
 
 
+add_subdirectory(RP2040-PWM-Tone pwm_tone)
+
 # rest of your project
 if (DISP_OVER_PIO)
     add_executable(ili9488_gpio main.c ili9488_pio.c
@@ -25,7 +27,8 @@ if (DISP_OVER_PIO)
     porting/lv_port_indev_template.c
     pio/i80.c keypad.c i2c_tools.c pcf8574.c ${SOURCES})
     pico_generate_pio_header(ili9488_gpio ${CMAKE_CURRENT_LIST_DIR}/pio/i80.pio)
-    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm hardware_pio hardware_dma hardware_i2c)
+    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm
+                hardware_pio hardware_dma hardware_i2c pwm_tone)
 else(DISP_OVER_PIO)
     add_executable(ili9488_gpio main.c ili9488_gpio.c
     porting/lv_port_disp_template.c ${SOURCES})

@@ -8,3 +8,6 @@
 	path = lvgl
 	url = https://github.com/lvgl/lvgl.git
 	branch = release/v8.3
+[submodule "ili9488-lvgl-keypad/RP2040-PWM-Tone"]
+	path = ili9488-lvgl-keypad/RP2040-PWM-Tone
+	url = https://github.com/TuriSc/RP2040-PWM-Tone/

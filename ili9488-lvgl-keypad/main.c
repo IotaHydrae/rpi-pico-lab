@@ -24,6 +24,12 @@
 #include "porting/lv_port_disp_template.h"
 #include "porting/lv_port_indev_template.h"
 
+#include "pwm-tone.h"   // Include the library
+#include "melodies.h"   // Optional, but ideal location to store custom melodies
+// Pin definitions
+#define PIEZO_PIN       22 // The pin the buzzer or speaker is connected to.
+                          // The other terminal of the buzzer is connected to ground.
+
 extern int i80_pio_init(void);
 
 bool lv_tick_timer_callback(struct repeating_timer *t)
@@ -34,6 +40,8 @@ bool lv_tick_timer_callback(struct repeating_timer *t)
 
 #define PICO_FLASH_SPI_CLKDIV 2
 #define CPU_SPEED_MHZ 280
+
+tonegenerator_t generator;
 
 int main(void)
 {
@@ -49,6 +57,28 @@ int main(void)
     printf("\n\n\nfl350hvc03v10 LVGL Porting\n");
 
     i80_pio_init();
+    // Initialize the tone generator, assigning it the output pin
+    tone_init(&generator, PIEZO_PIN);
+    // Use this function to speed up or down your melodies.
+    // Default tempo is 120bpm. Tempo does not affect tone().
+    set_tempo(120);
+
+    // This is an example sound effect. Each note defines a pitch (float, in Hz)
+    // and a duration (expressed in subdivisions of a whole note). This means that
+    // a duration of 16 is half a duration of 8. Negative values represent dotted notation,
+    // so that -8 = 8 + (8/2) = 12. This data structure is inspired by the work at
+    // https://github.com/robsoncouto/arduino-songs/
+    note_t sfx[] = {
+        {NOTE_C4, 16},
+        {NOTE_C5, 32},
+        {NOTE_C6, 64},
+        {REST, 8}, // Pause at the end to space out repeats of the melody
+        {MELODY_END, 0}, // Melody end code. Necessary to trigger repeats
+    };
+
+    // Let's play the sfx we just defined, repeating it twice
+    melody(&generator, sfx, 3);
+    while(generator.playing) { sleep_ms(2); }
 
     lv_init();
     lv_port_disp_init();
