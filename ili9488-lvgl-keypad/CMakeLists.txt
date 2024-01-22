@@ -17,8 +17,9 @@ file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
                             "lvgl/demos/music/*.c"
                             "lvgl/demos/keypad_encoder/*.c")
 
-
 add_subdirectory(RP2040-PWM-Tone pwm_tone)
+add_subdirectory(ui ui)
+target_include_directories(ui PRIVATE ${CMAKE_CURRENT_LIST_DIR}/)
 
 # rest of your project
 if (DISP_OVER_PIO)
@@ -28,7 +29,7 @@ if (DISP_OVER_PIO)
     pio/i80.c keypad.c i2c_tools.c pcf8574.c ${SOURCES})
     pico_generate_pio_header(ili9488_gpio ${CMAKE_CURRENT_LIST_DIR}/pio/i80.pio)
     target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm
-                hardware_pio hardware_dma hardware_i2c pwm_tone)
+                hardware_pio hardware_dma hardware_i2c pwm_tone ui)
 else(DISP_OVER_PIO)
     add_executable(ili9488_gpio main.c ili9488_gpio.c
     porting/lv_port_disp_template.c ${SOURCES})
@@ -36,6 +37,7 @@ else(DISP_OVER_PIO)
 endif(DISP_OVER_PIO)
 
 target_include_directories(ili9488_gpio PUBLIC .)
+
 pico_enable_stdio_usb(ili9488_gpio 0)
 pico_enable_stdio_uart(ili9488_gpio 1)
 

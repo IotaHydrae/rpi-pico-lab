@@ -1,0 +1,8 @@
+SET(SOURCES screens/ui_ScreenHome.c
+    ui.c
+    components/ui_comp_hook.c
+    ui_helpers.c
+    ui_events.c
+    fonts/ui_font_NotoSansSCMedium24.c)
+
+add_library(ui ${SOURCES})

@@ -24,6 +24,8 @@
 #include "porting/lv_port_disp_template.h"
 #include "porting/lv_port_indev_template.h"
 
+#include "ui/ui.h"
+
 #include "pwm-tone.h"   // Include the library
 #include "melodies.h"   // Optional, but ideal location to store custom melodies
 // Pin definitions
@@ -41,6 +43,7 @@ bool lv_tick_timer_callback(struct repeating_timer *t)
 #define PICO_FLASH_SPI_CLKDIV 2
 #define CPU_SPEED_MHZ 280
 
+static lv_group_t *g;
 tonegenerator_t generator;
 
 int main(void)
@@ -57,6 +60,8 @@ int main(void)
     printf("\n\n\nfl350hvc03v10 LVGL Porting\n");
 
     i80_pio_init();
+
+#if 0
     // Initialize the tone generator, assigning it the output pin
     tone_init(&generator, PIEZO_PIN);
     // Use this function to speed up or down your melodies.
@@ -77,8 +82,9 @@ int main(void)
     };
 
     // Let's play the sfx we just defined, repeating it twice
-    melody(&generator, sfx, 3);
+    melody(&generator, sfx, 2);
     while(generator.playing) { sleep_ms(2); }
+#endif
 
     lv_init();
     lv_port_disp_init();
@@ -87,13 +93,39 @@ int main(void)
     printf("Starting demo\n");
     // lv_demo_widgets();
     // lv_demo_stress();
-    lv_demo_keypad_encoder();
+    // lv_demo_keypad_encoder();
     // lv_demo_music();
     // lv_demo_benchmark();
-    
+    ui_init();
+
     struct repeating_timer timer;
     add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
 
+    g = lv_group_get_default();
+    if (g == NULL) {
+        g = lv_group_create();
+        lv_group_set_default(g);
+    }
+
+    lv_group_add_obj(g, ui_TextAreaSerialNumber);
+    lv_group_add_obj(g, ui_SwitchTheme);
+
+    lv_indev_t *cur_drv = NULL;
+    for (;;) {
+        cur_drv = lv_indev_get_next(cur_drv);
+        if (!cur_drv) {
+            break;
+        }
+
+        if (cur_drv->driver->type == LV_INDEV_TYPE_KEYPAD) {
+            lv_indev_set_group(cur_drv, g);
+        }
+
+        if (cur_drv->driver->type == LV_INDEV_TYPE_ENCODER) {
+            lv_indev_set_group(cur_drv, g);
+        }
+    }
+    
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
