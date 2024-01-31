@@ -22,6 +22,7 @@
 #include "lvgl/examples/lv_examples.h"
 #include "pico/time.h"
 #include "porting/lv_port_disp_template.h"
+#include "porting/lv_port_indev_template.h"
 
 extern int i80_pio_init(void);
 
@@ -49,14 +50,13 @@ int main(void)
 
     i80_pio_init();
 
-    i2c_tools_init();
-
     lv_init();
     lv_port_disp_init();
+    lv_port_indev_init();
 
     printf("Starting demo\n");
-    // lv_demo_widgets();
-    lv_demo_stress();
+    lv_demo_widgets();
+    // lv_demo_stress();
     // lv_demo_music();
     // lv_demo_benchmark();
     
