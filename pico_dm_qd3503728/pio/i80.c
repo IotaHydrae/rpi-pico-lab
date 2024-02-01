@@ -12,13 +12,10 @@
 
 #define USE_DMA 1
 
-#define I80_CLK_DIV 2.8f /* running at 50MHz when pll_sys = 280MHz */
+#define I80_CLK_DIV 2.5f /* running at 50MHz when pll_sys = 280MHz */
 // #define I80_CLK_DIV 5.6f /* running at 25MHz when pll_sys = 280MHz */
 
 #include "i80.pio.h"
-
-// #define LCD_PIN_RS 19
-// #define LCD_PIN_CS 18
 
 #define LCD_PIN_RS 20
 #define LCD_PIN_CS 18
@@ -31,32 +28,28 @@ void __time_critical_func(i80_set_rs_cs)(bool rs, bool cs)
     gpio_put_masked((1u << LCD_PIN_RS) | (1u << LCD_PIN_CS), !!rs << LCD_PIN_RS | !!cs << LCD_PIN_CS);
 }
 
+void __time_critical_func(i80_set_rs)(bool rs)
+{
+    gpio_put_masked(1u << LCD_PIN_RS, !!rs << LCD_PIN_RS);
+}
+
 #if USE_DMA
 /* DMA version */
 static uint dma_tx;
 static dma_channel_config c;
-static inline int __time_critical_func(i80_write_pio16_wr)(PIO pio, uint sm, void *buf, size_t len)
+static inline void __time_critical_func(i80_write_pio16_wr)(PIO pio, uint sm, void *buf, size_t len)
 {
-    uint16_t *txbuf = (uint16_t *)buf;
-
-    // const uint dma_tx = dma_claim_unused_channel(true);
-    // dma_channel_config c = dma_channel_get_default_config(dma_tx);
-
-    // channel_config_set_transfer_data_size(&c, DMA_SIZE_16);
-    // channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
-
     dma_channel_configure(dma_tx, &c,
                           &pio->txf[sm], /* write address */
-                          txbuf, /* read address */
+                          (uint16_t *)buf, /* read address */
                           len / 2, /* element count (each element is of size transfer_data_size) */
-                          false /* don't start yet */
+                          true /* start right now */
     );
 
-    dma_start_channel_mask(1u << dma_tx);
-    dma_channel_wait_for_finish_blocking(dma_tx);
+    // dma_start_channel_mask(1u << dma_tx);
 
-    // dma_channel_unclaim(dma_tx);
-    return 0;
+    /* TODO: use another core to wait. */
+    dma_channel_wait_for_finish_blocking(dma_tx);
 }
 #else
 static inline int i80_write_pio16_wr(PIO pio, uint sm, void *buf, size_t len)
@@ -79,14 +72,14 @@ static inline int i80_write_pio16_wr(PIO pio, uint sm, void *buf, size_t len)
 
 int __time_critical_func(i80_write_buf_rs)(void *buf, size_t len, bool rs)
 {
-    i80_wait_idle(g_pio, g_sm);
-    i80_set_rs_cs(rs, false);
+    // i80_wait_idle(g_pio, g_sm);
+    i80_set_rs(rs);
     i80_write_pio16_wr(g_pio, g_sm, buf, len);
-    i80_wait_idle(g_pio, g_sm);
+    // i80_wait_idle(g_pio, g_sm);
     return 0;
 }
 
-int i80_pio_init(void)
+int i80_pio_init(uint8_t db_base, uint8_t db_count, uint8_t pin_wr)
 {
     printf("i80 PIO initialzing...\n");
 
@@ -99,7 +92,7 @@ int i80_pio_init(void)
 #endif
 
     uint offset = pio_add_program(g_pio, &i80_program);
-    i80_program_init(g_pio, g_sm, offset, 0, 16, 19, I80_CLK_DIV);
+    i80_program_init(g_pio, g_sm, offset, db_base, db_count, pin_wr, I80_CLK_DIV);
 
     return 0;
 }

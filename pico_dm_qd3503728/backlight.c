@@ -34,4 +34,6 @@ void backlight_init(void)
     // Set divider, reduces counter clock to sysclock/this value
     pwm_config_set_clkdiv(&config, 1.f);
     pwm_init(slice_num, &config, true);
+
+    pwm_set_gpio_level(BACKLIGHT_PIN, 0);
 }

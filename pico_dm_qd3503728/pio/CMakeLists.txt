@@ -13,7 +13,7 @@ if(BUILD_TEST)
 
     pico_generate_pio_header(pio_i80 ${CMAKE_CURRENT_LIST_DIR}/i80.pio)
 
-    target_link_libraries(pio_i80 PRIVATE pico_stdlib hardware_pio)
+    target_link_libraries(pio_i80 PRIVATE pico_stdlib hardware_pio hardware_dma)
 
     pico_enable_stdio_usb(pio_i80 0)
     pico_enable_stdio_uart(pio_i80 1)
@@ -29,6 +29,7 @@ else(BUILD_TEST)
     target_link_libraries(pio_i80 PRIVATE
             pico_stdlib
             hardware_pio
+            hardware_dma
             )
 
 endif(BUILD_TEST)

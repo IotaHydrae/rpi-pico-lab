@@ -3,9 +3,8 @@
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 
+#include "ili9488.h" /* where we get x,y resolution */
 #include "ft6236.h"
-
-#include "porting/lv_port_disp_template.h" /* where display resolution defined */
 
 #define pr_debug printf
 
@@ -127,8 +126,8 @@ static void __ft6236_set_dir(struct ft6236_data *priv, ft6236_direction_t dir)
         priv->revert_x = !priv->revert_x;
         priv->revert_y = !priv->revert_y;
 
-        priv->x_res = MY_DISP_VER_RES;
-        priv->y_res = MY_DISP_HOR_RES;
+        priv->x_res = ILI9488_Y_RES;
+        priv->y_res = ILI9488_X_RES;
     } else {
         priv->read_x = __ft6236_read_x;
         priv->read_y = __ft6236_read_y;
@@ -174,8 +173,8 @@ static int ft6236_probe(struct ft6236_data *priv)
 
     priv->rst_pin     = FT6236_PIN_RST;
 
-    priv->x_res = MY_DISP_HOR_RES;
-    priv->y_res = MY_DISP_VER_RES;
+    priv->x_res = ILI9488_X_RES;
+    priv->y_res = ILI9488_Y_RES;
 
     priv->revert_x = false;
     priv->revert_y = false;

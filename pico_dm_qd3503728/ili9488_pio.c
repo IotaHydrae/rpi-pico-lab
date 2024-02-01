@@ -23,15 +23,13 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
-#include "backlight.h"
+#include "ili9488.h"
 
 /*
  * ili9488 Command Table
  */
 
 #define DRV_NAME "ili9488"
-#define WIDTH  480
-#define HEIGHT 320
 
 #define pr_debug printf
 
@@ -130,7 +128,7 @@ static int ili9488_reset(struct ili9488_priv *priv)
     dm_gpio_set_value(&priv->gpio.reset, 1);
     mdelay(10);
     dm_gpio_set_value(&priv->gpio.reset, 0);
-    mdelay(50);
+    mdelay(10);
     dm_gpio_set_value(&priv->gpio.reset, 1);
     mdelay(10);
     return 0;
@@ -147,8 +145,8 @@ static int ili9488_init_display(struct ili9488_priv *priv)
 {
     pr_debug("%s, writing initial sequence...\n", __func__);
     ili9488_reset(priv);
-    dm_gpio_set_value(&priv->gpio.rd, 1);
-    mdelay(150);
+    // dm_gpio_set_value(&priv->gpio.rd, 1);
+    // mdelay(150);
 
     write_reg(priv, 0xf7, 0xa9, 0x51, 0x2c, 0x82);
 
@@ -179,7 +177,7 @@ static int ili9488_init_display(struct ili9488_priv *priv)
     write_reg(priv, 0xe1, 0x00, 0x17, 0x1a, 0x04, 0x0e, 0x06, 0x2f, 0x45, 0x43, 0x02, 0x0a, 0x09, 0x32, 0x36, 0x0f);
 
     write_reg(priv, 0x11);
-    mdelay(120);
+    mdelay(60);
     write_reg(priv, 0x29);
 
     return 0;
@@ -248,13 +246,13 @@ static int ili9488_gpio_init(struct ili9488_priv *priv)
     printf("initializing gpios...\n");
 
     gpio_init(priv->gpio.reset);
-    gpio_init(priv->gpio.bl);
+    // gpio_init(priv->gpio.bl);
     // gpio_init(priv->gpio.cs);
     gpio_init(priv->gpio.rs);
     // gpio_init(priv->gpio.rd);
 
     gpio_set_dir(priv->gpio.reset, GPIO_OUT);
-    gpio_set_dir(priv->gpio.bl, GPIO_OUT);
+    // gpio_set_dir(priv->gpio.bl, GPIO_OUT);
     // gpio_set_dir(priv->gpio.cs, GPIO_OUT);
     gpio_set_dir(priv->gpio.rs, GPIO_OUT);
     // gpio_set_dir(priv->gpio.rd, GPIO_OUT);
@@ -262,30 +260,26 @@ static int ili9488_gpio_init(struct ili9488_priv *priv)
     return 0;
 }
 
+int i80_pio_init(uint8_t db_base, uint8_t db_count, uint8_t pin_wr);
 static int ili9488_hw_init(struct ili9488_priv *priv)
 {
     int ret;
 
     printf("initializing hardware...\n");
 
+    i80_pio_init(priv->gpio.db[0], ARRAY_SIZE(priv->gpio.db), priv->gpio.wr);
+
     ili9488_gpio_init(priv);
 
     priv->tftops->init_display(priv);
-
-    priv->tftops->clear(priv, 0x0);
-
-    /* enable backlight after screen get cleared */
-    // dm_gpio_set_value(&priv->gpio.bl, 1);
-    backlight_init();
-    backlight_set_level(100);
-    pr_debug("backlight set to 100%%\n");
+    // priv->tftops->clear(priv, 0x0);
 
     return 0;
 }
 
 static struct ili9488_display default_ili9488_display = {
-    .xres   = WIDTH,
-    .yres   = HEIGHT,
+    .xres   = ILI9488_X_RES,
+    .yres   = ILI9488_Y_RES,
     .bpp    = 16,
     .rotate = 0,
 };
@@ -298,18 +292,18 @@ static int ili9488_video_sync(struct ili9488_priv *priv, int xs, int ys, int xe,
     return 0;
 }
 
-int ili9488_video_flush(int xs, int ys, int xe, int ye, void *data, size_t len)
+int ili9488_video_flush(int xs, int ys, int xe, int ye, void *vmem16, uint32_t len)
 {
-    ili9488_video_sync(&g_priv, xs, ys, xe, ye, data, len);
+    ili9488_video_sync(&g_priv, xs, ys, xe, ye, vmem16, len);
     return 0;
 }
 
-#define PAGE_SIZE (1 << 12)
+#define BUF_SIZE 64
 static int ili9488_probe(struct ili9488_priv *priv)
 {
     pr_debug("ili9488 probing ...\n");
     
-    priv->buf = (u8 *)malloc(PAGE_SIZE);
+    priv->buf = (u8 *)malloc(BUF_SIZE);
     
     priv->display = &default_ili9488_display;
     priv->tftops = &default_ili9488_ops;
@@ -321,6 +315,7 @@ static int ili9488_probe(struct ili9488_priv *priv)
     priv->gpio.wr    = 19;
     // priv->gpio.cs    = 18;
 
+    /* pin0 - pin15 for I8080 data bus */
     for (int i = 0; i < ARRAY_SIZE(priv->gpio.db); i++)
         priv->gpio.db[i] = i;
 
@@ -329,41 +324,8 @@ static int ili9488_probe(struct ili9488_priv *priv)
     return 0;
 }
 
-#include "hardware/vreg.h"
-#include "hardware/clocks.h"
-
-#define CPU_SPEED_MHZ 240
-
-extern int i80_pio_init(void);
-
-#if 0
-int main()
-{
-    vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
-    set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
-    clock_configure(clk_peri,
-                    0,
-                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
-                    CPU_SPEED_MHZ * MHZ,
-                    CPU_SPEED_MHZ * MHZ);
-    stdio_uart_init_full(uart0, 115200, 16, 17);
-
-    pr_debug("\n\n\n\nThis is a simple test driver for ili9488\n");
-
-    i80_pio_init();
-
-    ili9488_probe(&g_priv);
-
-    u16 color = 0x0000;
-
-    for (;color < 0xffff; color+=64) {
-        g_priv.tftops->clear(&g_priv, color);
-    }
-}
-#else
 int ili9488_driver_init(void)
 {
     ili9488_probe(&g_priv);
     return 0;
 }
-#endif

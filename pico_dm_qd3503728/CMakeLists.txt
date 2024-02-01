@@ -10,7 +10,10 @@ project(ili9488_gpio)
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
+SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -Wl,--print-memory-usage")
+SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--print-memory-usage")
+
+file(GLOB_RECURSE LVGL_SOURCES "lvgl/src/*.c"
                             "lvgl/demos/widgets/*.c"
                             "lvgl/demos/stress/*.c"
                             "lvgl/demos/benchmark/*.c"
@@ -18,23 +21,37 @@ file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
                             "lvgl/demos/keypad_encoder/*.c")
 
 
-# rest of your project
-if (DISP_OVER_PIO)
-    add_executable(ili9488_gpio main.c ili9488_pio.c ft6236.c
+add_subdirectory(pio)
+
+file(GLOB_RECURSE COMMON_SOURCES
+    main.c
+    ft6236.c
     porting/lv_port_disp_template.c
     porting/lv_port_indev_template.c
-    pio/i80.c i2c_tools.c backlight.c ${SOURCES})
-    pico_generate_pio_header(ili9488_gpio ${CMAKE_CURRENT_LIST_DIR}/pio/i80.pio)
-    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm
-                    hardware_pio hardware_dma hardware_i2c)
+    i2c_tools.c
+    backlight.c
+)
+
+# rest of your project
+if (DISP_OVER_PIO)
+    add_executable(ili9488_gpio ili9488_pio.c ${LVGL_SOURCES} ${COMMON_SOURCES})
+    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm hardware_i2c pio_i80)
 else(DISP_OVER_PIO)
-    add_executable(ili9488_gpio main.c ili9488_gpio.c
-    porting/lv_port_disp_template.c ${SOURCES})
-    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm)
+    add_executable(ili9488_gpio ili9488_gpio.c ${LVGL_SOURCES} ${COMMON_SOURCES})
+    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm hardware_i2c)
 endif(DISP_OVER_PIO)
 
 target_include_directories(ili9488_gpio PUBLIC .)
+
 pico_enable_stdio_usb(ili9488_gpio 0)
 pico_enable_stdio_uart(ili9488_gpio 1)
 
 pico_add_extra_outputs(ili9488_gpio)
+
+add_custom_target(
+    print-memory-usage ALL
+    COMMAND arm-none-eabi-size -G ${CMAKE_PROJECT_NAME}.elf
+    DEPENDS ${CMAKE_PROJECT_NAME}.elf
+    COMMENT "Print memory usage"
+    DEPENDS ili9488_gpio
+)

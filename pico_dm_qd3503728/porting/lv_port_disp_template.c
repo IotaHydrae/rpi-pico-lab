@@ -41,9 +41,6 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
  *   GLOBAL FUNCTIONS
  **********************/
 
-extern int ili9488_driver_init();
-extern int ili9488_video_flush(int xs, int ys, int xe, int ye, void *vmem16, size_t len);
-
 void lv_port_disp_init(void)
 {
     /*-------------------------
@@ -76,7 +73,8 @@ void lv_port_disp_init(void)
      *      and you only need to change the frame buffer's address.
      */
 
-#define MY_DISP_BUF_SIZE    (MY_DISP_HOR_RES * 160)
+/* a half screen disp buffer */
+#define MY_DISP_BUF_SIZE    (MY_DISP_HOR_RES * MY_DISP_VER_RES / 2)
 
     /* Example for 1) */
     static lv_disp_draw_buf_t draw_buf_dsc_1;
