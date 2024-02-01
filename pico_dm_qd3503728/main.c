@@ -8,10 +8,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "pico/platform.h"
+#include "pico/time.h"
 #include "pico/stdio.h"
-#include "pico/stdio_uart.h"
 #include "pico/stdlib.h"
+#include "pico/platform.h"
+#include "pico/stdio_uart.h"
+
 #include "hardware/pll.h"
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
@@ -20,9 +22,13 @@
 #include "lvgl/lvgl.h"
 #include "lvgl/demos/lv_demos.h"
 #include "lvgl/examples/lv_examples.h"
-#include "pico/time.h"
 #include "porting/lv_port_disp_template.h"
 #include "porting/lv_port_indev_template.h"
+
+#include "backlight.h"
+
+#define PICO_FLASH_SPI_CLKDIV 2
+#define CPU_SPEED_MHZ 280
 
 extern int i80_pio_init(void);
 
@@ -31,9 +37,6 @@ bool lv_tick_timer_callback(struct repeating_timer *t)
     lv_timer_handler();
     return true;
 }
-
-#define PICO_FLASH_SPI_CLKDIV 2
-#define CPU_SPEED_MHZ 280
 
 int main(void)
 {
@@ -59,7 +62,7 @@ int main(void)
     // lv_demo_stress();
     // lv_demo_music();
     // lv_demo_benchmark();
-    
+
     struct repeating_timer timer;
     add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
 

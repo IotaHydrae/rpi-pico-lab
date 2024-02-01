@@ -3,22 +3,36 @@
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 
-// #include "i2c-gpio.h"
 #include "ft6236.h"
 
-#define FT6236_ADDR 0x38
-#define FT6236_DEFAULT_SPEED 400000
+#include "porting/lv_port_disp_template.h" /* where display resolution defined */
+
+#define pr_debug printf
+
+#define FT6236_ADDR      0x38
+#define FT6236_DEF_SPEED 400000
 
 struct ft6236_data {
     struct {
         uint8_t addr;
         i2c_inst_t *master;
+        uint32_t speed;
+
         uint8_t scl_pin;
         uint8_t sda_pin;
     } i2c;
 
     uint8_t irq_pin;
     uint8_t rst_pin;
+
+    uint16_t x_res;
+    uint16_t y_res;
+
+    ft6236_direction_t dir;   /* direction set */
+    bool revert_x;
+    bool revert_y;
+    uint16_t (*read_x)(struct ft6236_data *priv);
+    uint16_t (*read_y)(struct ft6236_data *priv);
 } g_ft6236_data;
 
 extern int i2c_bus_scan(i2c_inst_t *i2c);
@@ -39,46 +53,51 @@ static uint8_t ft6236_read_reg(struct ft6236_data *priv, uint8_t reg)
 }
 #define read_reg ft6236_read_reg
 
-static void ft6236_hw_init(struct ft6236_data *priv)
+static void __ft6236_reset(struct ft6236_data *priv)
 {
-    i2c_init(priv->i2c.master, FT6236_DEFAULT_SPEED);
-
-    gpio_set_function(priv->i2c.scl_pin, GPIO_FUNC_I2C);
-    gpio_set_function(priv->i2c.sda_pin, GPIO_FUNC_I2C);
-
-    gpio_pull_up(priv->i2c.scl_pin);
-    gpio_pull_up(priv->i2c.sda_pin);
+    gpio_put(priv->rst_pin, 1);
+    sleep_ms(10);
+    gpio_put(priv->rst_pin, 0);
+    sleep_ms(10);
+    gpio_put(priv->rst_pin, 1);
+    sleep_ms(10);
 }
 
 static uint16_t __ft6236_read_x(struct ft6236_data *priv)
 {
-    uint8_t val_h = read_reg(priv, FT_REG_TOUCH1_XH) & 0x1f;
+    uint8_t val_h = read_reg(priv, FT_REG_TOUCH1_XH) & 0x1f;  /* the MSB is always high, but it shouldn't */
     uint8_t val_l = read_reg(priv, FT_REG_TOUCH1_XL);
-    // printf("ft6236_read_x: %02x %02x\n", val_h, val_l);
-    return (val_h << 8) | val_l;
+    uint16_t val = (val_h << 8) | val_l;
+    
+    if (priv->revert_x)
+        return (priv->x_res - val);
+
+    return val;
 }
 
 uint16_t ft6236_read_x(void)
 {
-    return __ft6236_read_x(&g_ft6236_data);
+    return g_ft6236_data.read_x(&g_ft6236_data);
 }
 
 static uint16_t __ft6236_read_y(struct ft6236_data *priv)
 {
     uint8_t val_h = read_reg(priv, FT_REG_TOUCH1_YH);
     uint8_t val_l = read_reg(priv, FT_REG_TOUCH1_YL);
-    return (val_h << 8) | val_l;
+    if (priv->revert_y)
+        return (priv->y_res - ((val_h << 8) | val_l));
+    else
+        return ((val_h << 8) | val_l);
 }
 
 uint16_t ft6236_read_y(void)
 {
-    return __ft6236_read_y(&g_ft6236_data);
+    return g_ft6236_data.read_y(&g_ft6236_data);
 }
 
 static bool __ft6236_is_pressed(struct ft6236_data *priv)
 {
     uint8_t val = read_reg(priv, FT_REG_TD_STATUS);
-    // printf("ft6236_is_pressed: %02x\n", val);
     return val;
 }
 
@@ -87,15 +106,81 @@ bool ft6236_is_pressed(void)
     return __ft6236_is_pressed(&g_ft6236_data);
 }
 
+static void __ft6236_set_dir(struct ft6236_data *priv, ft6236_direction_t dir)
+{
+    priv->dir = dir;
+
+    if (dir & FT6236_DIR_REVERT_X)
+        priv->revert_x = true;
+    else
+        priv->revert_x = false;
+
+    if (dir & FT6236_DIR_REVERT_Y)
+        priv->revert_y = true;
+    else
+        priv->revert_y = false;
+
+    if (dir & FT6236_DIR_SWITCH_XY) {
+        priv->read_x = __ft6236_read_y;
+        priv->read_y = __ft6236_read_x;
+
+        priv->revert_x = !priv->revert_x;
+        priv->revert_y = !priv->revert_y;
+
+        priv->x_res = MY_DISP_VER_RES;
+        priv->y_res = MY_DISP_HOR_RES;
+    } else {
+        priv->read_x = __ft6236_read_x;
+        priv->read_y = __ft6236_read_y;
+    }
+}
+
+void ft6236_set_dir(ft6236_direction_t dir)
+{
+    __ft6236_set_dir(&g_ft6236_data, dir);
+}
+
+static void ft6236_hw_init(struct ft6236_data *priv)
+{
+    i2c_init(priv->i2c.master, FT6236_DEF_SPEED);
+
+    gpio_set_function(priv->i2c.scl_pin, GPIO_FUNC_I2C);
+    gpio_set_function(priv->i2c.sda_pin, GPIO_FUNC_I2C);
+
+    gpio_pull_up(priv->i2c.scl_pin);
+    gpio_pull_up(priv->i2c.sda_pin);
+
+    gpio_init(priv->rst_pin);
+    gpio_set_dir(priv->rst_pin, GPIO_OUT);
+    gpio_pull_up(priv->rst_pin);
+
+    __ft6236_reset(priv);
+
+    /* registers are read-only */
+    // write_reg(priv, FT_REG_DEVICE_MODE, 0x00);
+    // write_reg(priv, FT_REG_TH_GROUP, 22);
+    // write_reg(priv, FT_REG_PERIODACTIVE, 12);
+
+    /* initialize touch direction */
+    __ft6236_set_dir(priv, priv->dir);
+}
+
 static int ft6236_probe(struct ft6236_data *priv)
 {
     priv->i2c.master  = i2c1;
     priv->i2c.addr    = FT6236_ADDR;
-    priv->i2c.scl_pin = 27;
-    priv->i2c.sda_pin = 26;
+    priv->i2c.scl_pin = FT6236_PIN_SCL;
+    priv->i2c.sda_pin = FT6236_PIN_SDA;
 
-    priv->irq_pin = 21;
-    priv->rst_pin = 18;
+    priv->rst_pin     = FT6236_PIN_RST;
+
+    priv->x_res = MY_DISP_HOR_RES;
+    priv->y_res = MY_DISP_VER_RES;
+
+    priv->revert_x = false;
+    priv->revert_y = false;
+
+    priv->dir = FT6236_DIR_SWITCH_XY | FT6236_DIR_REVERT_Y;
 
     ft6236_hw_init(priv);
 

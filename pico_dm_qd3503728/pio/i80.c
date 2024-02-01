@@ -12,8 +12,8 @@
 
 #define USE_DMA 1
 
-// #define I80_CLK_DIV 2.5f
-#define I80_CLK_DIV 5.6f /* running at 25MHz when pll_sys = 280MHz */
+#define I80_CLK_DIV 2.8f /* running at 50MHz when pll_sys = 280MHz */
+// #define I80_CLK_DIV 5.6f /* running at 25MHz when pll_sys = 280MHz */
 
 #include "i80.pio.h"
 

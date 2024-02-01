@@ -23,7 +23,7 @@ if (DISP_OVER_PIO)
     add_executable(ili9488_gpio main.c ili9488_pio.c ft6236.c
     porting/lv_port_disp_template.c
     porting/lv_port_indev_template.c
-    pio/i80.c i2c_tools.c ${SOURCES})
+    pio/i80.c i2c_tools.c backlight.c ${SOURCES})
     pico_generate_pio_header(ili9488_gpio ${CMAKE_CURRENT_LIST_DIR}/pio/i80.pio)
     target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm
                     hardware_pio hardware_dma hardware_i2c)

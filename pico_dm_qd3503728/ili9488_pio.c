@@ -23,13 +23,15 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
+#include "backlight.h"
+
 /*
  * ili9488 Command Table
  */
 
 #define DRV_NAME "ili9488"
-#define WIDTH  320
-#define HEIGHT 480
+#define WIDTH  480
+#define HEIGHT 320
 
 #define pr_debug printf
 
@@ -273,8 +275,10 @@ static int ili9488_hw_init(struct ili9488_priv *priv)
     priv->tftops->clear(priv, 0x0);
 
     /* enable backlight after screen get cleared */
-    dm_gpio_set_value(&priv->gpio.bl, 1);
-    pr_debug("backlight enabled\n");
+    // dm_gpio_set_value(&priv->gpio.bl, 1);
+    backlight_init();
+    backlight_set_level(100);
+    pr_debug("backlight set to 100%%\n");
 
     return 0;
 }

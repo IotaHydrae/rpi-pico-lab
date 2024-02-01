@@ -38,18 +38,3 @@ int i2c_bus_scan(i2c_inst_t *i2c)
     printf("Done.\n");
     return 0;
 }
-
-#if 1
-void i2c_tools_init(void)
-{
-    i2c_init(i2c1, 1000000);
-
-    gpio_set_function(26, GPIO_FUNC_I2C);
-    gpio_set_function(27, GPIO_FUNC_I2C);
-
-    gpio_pull_up(26);
-    gpio_pull_up(27);
-
-    i2c_bus_scan(i2c1);
-}
-#endif
