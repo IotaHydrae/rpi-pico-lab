@@ -51,7 +51,7 @@ pico_add_extra_outputs(ili9488_gpio)
 add_custom_target(
     print-memory-usage ALL
     COMMAND arm-none-eabi-size -G ${CMAKE_PROJECT_NAME}.elf
-    DEPENDS ${CMAKE_PROJECT_NAME}.elf
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/build/${CMAKE_PROJECT_NAME}.elf
     COMMENT "Print memory usage"
     DEPENDS ili9488_gpio
 )

@@ -72,6 +72,7 @@ int main(void)
     printf("going to loop, %lld\n", time_us_64());
     for (;;) {
         tight_loop_contents();
+        sleep_ms(200);
     }
 
     return 0;
