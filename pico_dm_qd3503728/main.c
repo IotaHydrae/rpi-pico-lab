@@ -36,6 +36,8 @@ bool lv_tick_timer_callback(struct repeating_timer *t)
     return true;
 }
 
+extern int factory_test(void);
+
 int main(void)
 {
     vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
@@ -59,7 +61,9 @@ int main(void)
     // lv_demo_music();
 
     /* measure weighted fps and opa speed */
-    lv_demo_benchmark();
+    // lv_demo_benchmark();
+
+    factory_test();
 
     struct repeating_timer timer;
     add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);

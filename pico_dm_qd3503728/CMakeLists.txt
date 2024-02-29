@@ -5,7 +5,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # note: this must happen before project()
 include(pico_sdk_import.cmake)
 
-project(ili9488_gpio)
+project(pico_dm_qd3503728)
 
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
@@ -13,15 +13,13 @@ pico_sdk_init()
 SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -Wl,--print-memory-usage")
 SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--print-memory-usage")
 
-file(GLOB_RECURSE LVGL_SOURCES "lvgl/src/*.c"
-                            "lvgl/demos/widgets/*.c"
-                            "lvgl/demos/stress/*.c"
-                            "lvgl/demos/benchmark/*.c"
-                            "lvgl/demos/music/*.c"
-                            "lvgl/demos/keypad_encoder/*.c")
+include_directories(./ include)
 
-
+add_subdirectory(lvgl)
 add_subdirectory(pio)
+add_subdirectory(factory)
+
+target_link_libraries(lvgl PRIVATE pico_stdlib)
 
 file(GLOB_RECURSE COMMON_SOURCES
     main.c
@@ -34,24 +32,32 @@ file(GLOB_RECURSE COMMON_SOURCES
 
 # rest of your project
 if (DISP_OVER_PIO)
-    add_executable(ili9488_gpio ili9488_pio.c ${LVGL_SOURCES} ${COMMON_SOURCES})
-    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm hardware_i2c pio_i80)
+    add_executable(${PROJECT_NAME} ili9488_pio.c ${COMMON_SOURCES})
+    target_link_libraries(${PROJECT_NAME}
+        pico_bootsel_via_double_reset 
+        pico_stdlib hardware_pwm 
+        hardware_i2c pio_i80 factory_test
+        lvgl lvgl::demos lvgl::examples)
 else(DISP_OVER_PIO)
-    add_executable(ili9488_gpio ili9488_gpio.c ${LVGL_SOURCES} ${COMMON_SOURCES})
-    target_link_libraries(ili9488_gpio pico_stdlib hardware_pwm hardware_i2c)
+    add_executable(${PROJECT_NAME} ili9488_gpio.c ${LVGL_SOURCES} ${COMMON_SOURCES})
+    target_link_libraries(${PROJECT_NAME}
+        pico_bootsel_via_double_reset
+        pico_stdlib hardware_pwm
+        hardware_i2c factory_test
+        lvgl lvgl::demos lvgl::examples)
 endif(DISP_OVER_PIO)
 
-target_include_directories(ili9488_gpio PUBLIC .)
+target_include_directories(${PROJECT_NAME} PUBLIC .)
 
-pico_enable_stdio_usb(ili9488_gpio 0)
-pico_enable_stdio_uart(ili9488_gpio 1)
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_uart(${PROJECT_NAME} 1)
 
-pico_add_extra_outputs(ili9488_gpio)
+pico_add_extra_outputs(${PROJECT_NAME})
 
 add_custom_target(
     print-memory-usage ALL
     COMMAND arm-none-eabi-size -G ${CMAKE_PROJECT_NAME}.elf
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/build/${CMAKE_PROJECT_NAME}.elf
     COMMENT "Print memory usage"
-    DEPENDS ili9488_gpio
+    DEPENDS ${PROJECT_NAME}
 )
