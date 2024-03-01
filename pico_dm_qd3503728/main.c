@@ -27,9 +27,6 @@
 
 #include "backlight.h"
 
-#define PICO_FLASH_SPI_CLKDIV 2
-#define CPU_SPEED_MHZ 280
-
 bool lv_tick_timer_callback(struct repeating_timer *t)
 {
     lv_timer_handler();
@@ -40,15 +37,18 @@ extern int factory_test(void);
 
 int main(void)
 {
-    vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
+    /* NOTE: DO NOT MODIFY THIS BLOCK */
+#define CPU_SPEED_MHZ (DEFAULT_SYS_CLK_KHZ / 1000)
+    vreg_set_voltage(VREG_VOLTAGE_1_20);
     set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
     clock_configure(clk_peri,
                     0,
                     CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
                     CPU_SPEED_MHZ * MHZ,
                     CPU_SPEED_MHZ * MHZ);
-
     stdio_uart_init_full(uart0, 115200, 16, 17);
+
+
     printf("\n\n\nPICO DM QD3503728 LVGL Porting\n");
 
     lv_init();
@@ -61,9 +61,9 @@ int main(void)
     // lv_demo_music();
 
     /* measure weighted fps and opa speed */
-    // lv_demo_benchmark();
+    lv_demo_benchmark();
 
-    factory_test();
+    // factory_test();
 
     struct repeating_timer timer;
     add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);

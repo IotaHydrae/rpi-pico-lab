@@ -1,28 +1,71 @@
+#include <stdio.h>
 #include <string.h>
+
+#include "pico/stdlib.h"
+#include "pico/unique_id.h"
+#include "pico/bootrom.h"
+#include "pico/platform.h"
+#include "hardware/clocks.h"
+
 #include "lvgl/lvgl.h"
 
 #include "backlight.h"
+#include "tools.h"
 
 #define LV_PRId32 PRId32
+
+LV_FONT_DECLARE(fsex_16);
+LV_FONT_DECLARE(fsex_20);
 
 static lv_obj_t *scr_home;
 static lv_obj_t *scr_backlight;
 static lv_obj_t *scr_touch;
-static lv_obj_t *scr_stress;
+static lv_obj_t *scr_misc;
 
 static lv_obj_t * btnm1_home;
 
-static const lv_font_t * font_normal = LV_FONT_DEFAULT;
+static const lv_font_t * font_normal = &fsex_16;
+static const lv_font_t * font_large = &fsex_20;
 
 static bool test_bl_passed = false;
 static bool test_touch_passed = false;
-static bool test_stress_passed = false;
+static bool test_misc_passed = false;
 
 static void btn_home_event_handler(lv_event_t * e)
 {
-    lv_scr_load(scr_home);
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_PRESSED) {
+        lv_scr_load(scr_home);
+    }
+}
 
-    lv_event_send(btnm1_home, LV_EVENT_SCREEN_LOADED, NULL);
+static void btn_passed_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    lv_obj_t * obj = lv_event_get_target(e);
+    bool *passed = lv_obj_get_user_data(obj);
+    lv_obj_t *lbl = lv_obj_get_child(obj, 0);
+
+    if(code == LV_EVENT_PRESSED){
+
+        *passed = !*passed;
+        if(*passed) {
+            lv_obj_set_style_bg_color(obj, lv_palette_main(LV_PALETTE_GREEN), 0);
+        } else {
+            lv_obj_set_style_bg_color(obj, lv_palette_main(LV_PALETTE_RED), 0);
+        }
+        lv_label_set_text_fmt(lbl, "Passed: %s", *passed ? "Yes" : "No");
+    }
+}
+
+static void return_to_bootsel_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_PRESSED) {
+        /* reset to bootsel mode */
+        reset_usb_boot(0, 0);
+    }
 }
 
 static void slider_backlight_event_cb(lv_event_t * e)
@@ -75,60 +118,13 @@ static void slider_backlight_event_cb(lv_event_t * e)
     }
 }
 
-static void btn_passed_event_handler(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-
-    lv_obj_t * obj = lv_event_get_target(e);
-    bool *passed = lv_obj_get_user_data(obj);
-    lv_obj_t *lbl = lv_obj_get_child(obj, 0);
-
-    if(code == LV_EVENT_PRESSED){
-
-        *passed = !*passed;
-        if(*passed) {
-            lv_obj_set_style_bg_color(obj, lv_palette_main(LV_PALETTE_GREEN), 0);
-        } else {
-            lv_obj_set_style_bg_color(obj, lv_palette_main(LV_PALETTE_RED), 0);
-        }
-        lv_label_set_text_fmt(lbl, "Passed: %s", *passed ? "Yes" : "No");
-    }
-    
-    
-}
-
-static lv_obj_t *create_btn(lv_obj_t *parent, const char *txt, lv_event_cb_t event_cb)
-{
-    lv_obj_t *btn_home = lv_btn_create(parent);
-    lv_obj_t *label = lv_label_create(btn_home);
-    lv_label_set_text(label, LV_SYMBOL_HOME);
-    lv_obj_add_event_cb(btn_home, btn_home_event_handler, LV_EVENT_PRESSED, NULL);
-    return btn_home;
-}
-
-static lv_obj_t *create_passed_if_btn(lv_obj_t *parent, lv_event_cb_t event_cb, bool *passed)
-{
-    lv_obj_t * btn_passed = lv_btn_create(parent);
-    lv_obj_add_event_cb(btn_passed, event_cb, LV_EVENT_ALL, NULL);
-    // lv_obj_align(btn_passed, LV_ALIGN_CENTER, 0, 60);
-    lv_obj_set_height(btn_passed, LV_SIZE_CONTENT);
-    lv_obj_set_user_data(btn_passed, passed);
-    lv_obj_set_style_bg_color(btn_passed, lv_palette_main(LV_PALETTE_RED), 0);
-
-    lv_obj_t *label_passed = lv_label_create(btn_passed);
-    lv_label_set_text_fmt(label_passed, "Passed: %s", test_bl_passed ? "Yes" : "No");
-    lv_obj_center(label_passed);
-
-    return btn_passed;
-}
-
 static int scr_backlight_init(void)
 {
     scr_backlight = lv_obj_create(NULL);
 
     lv_obj_t *title_label = lv_label_create(scr_backlight);
     lv_label_set_text(title_label, "Backlight Test");
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(title_label, font_large, 0);
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 20);
 
     /* backlight controller slider */
@@ -140,17 +136,23 @@ static int scr_backlight_init(void)
 
     lv_obj_t *label_slider_val = lv_label_create(scr_backlight);
     lv_label_set_text_fmt(label_slider_val, "Backlight level : %d", lv_slider_get_value(slider1));
-    lv_obj_set_style_text_font(label_slider_val, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(label_slider_val, font_large, 0);
     lv_obj_align(label_slider_val, LV_ALIGN_CENTER, 0, -40);
 
     lv_obj_set_user_data(slider1, label_slider_val);
 
     /* a passed-if btn create here */
-    lv_obj_t *btn_passed = create_passed_if_btn(scr_backlight, btn_passed_event_handler, &test_bl_passed);
+    lv_obj_t *btn_passed = create_passed_if_btn(scr_backlight, btn_passed_event_cb, &test_bl_passed);
     lv_obj_align(btn_passed, LV_ALIGN_TOP_RIGHT, -10, 10);
 
+    /* a fel return btn create here */
+    lv_obj_t *btn_fel = create_btn(scr_backlight, "Return to FEL", return_to_bootsel_event_cb);
+    lv_obj_set_style_text_font(btn_fel, font_normal, 0);
+    lv_obj_set_style_bg_color(btn_fel, lv_color_black(), 0);
+    lv_obj_align(btn_fel, LV_ALIGN_TOP_LEFT, 10, 10);
+
     /* create return-to-home button */
-    lv_obj_t *btn_home = create_btn(scr_backlight, LV_SYMBOL_HOME, btn_home_event_handler);
+    lv_obj_t *btn_home = create_btn(scr_backlight, "Home", btn_home_event_handler);
     lv_obj_align(btn_home, LV_ALIGN_BOTTOM_MID, 0, -10);
 
     return 0;
@@ -162,38 +164,65 @@ static int scr_touch_init(void)
 
     lv_obj_t *title_label = lv_label_create(scr_touch);
     lv_label_set_text(title_label, "Touch Test");
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(title_label, font_large, 0);
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 20);
 
     /* a passed-if btn create here */
-    lv_obj_t *btn_passed = create_passed_if_btn(scr_touch, btn_passed_event_handler, &test_touch_passed);
+    lv_obj_t *btn_passed = create_passed_if_btn(scr_touch, btn_passed_event_cb, &test_touch_passed);
     lv_obj_align(btn_passed, LV_ALIGN_TOP_RIGHT, -10, 10);
 
+    /* a fel return btn create here */
+    lv_obj_t *btn_fel = create_btn(scr_touch, "Return to FEL", return_to_bootsel_event_cb);
+    lv_obj_set_style_text_font(btn_fel, font_normal, 0);
+    lv_obj_set_style_bg_color(btn_fel, lv_color_black(), 0);
+    lv_obj_align(btn_fel, LV_ALIGN_TOP_LEFT, 10, 10);
+
     /* create return-to-home button */
-    lv_obj_t *btn_home = create_btn(scr_touch, LV_SYMBOL_HOME, btn_home_event_handler);
+    lv_obj_t *btn_home = create_btn(scr_touch, "Home", btn_home_event_handler);
     lv_obj_align(btn_home, LV_ALIGN_BOTTOM_MID, 0, -10);
     return 0;
 }
 
-static int scr_stress_init(void)
+static int scr_misc_init(void)
 {
-    scr_stress = lv_obj_create(NULL);
+    scr_misc = lv_obj_create(NULL);
 
-    lv_obj_t *title_label = lv_label_create(scr_stress);
-    lv_label_set_text(title_label, "Stress Test");
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_20, 0);
+    lv_obj_t *title_label = lv_label_create(scr_misc);
+    lv_label_set_text(title_label, "Misc Test");
+    lv_obj_set_style_text_font(title_label, font_large, 0);
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 20);
 
     /* a passed-if btn create here */
-    lv_obj_t *btn_passed = create_passed_if_btn(scr_stress, btn_passed_event_handler, &test_stress_passed);
+    lv_obj_t *btn_passed = create_passed_if_btn(scr_misc, btn_passed_event_cb, &test_misc_passed);
     lv_obj_align(btn_passed, LV_ALIGN_TOP_RIGHT, -10, 10);
 
+    /* a fel return btn create here */
+    lv_obj_t *btn_fel = create_btn(scr_misc, "Return to FEL", return_to_bootsel_event_cb);
+    lv_obj_set_style_text_font(btn_fel, font_normal, 0);
+    lv_obj_set_style_bg_color(btn_fel, lv_color_black(), 0);
+    lv_obj_align(btn_fel, LV_ALIGN_TOP_LEFT, 10, 10);
+
     /* create return-to-home button */
-    lv_obj_t *btn_home = create_btn(scr_stress, LV_SYMBOL_HOME, btn_home_event_handler);
+    lv_obj_t *btn_home = create_btn(scr_misc, "Home", btn_home_event_handler);
     lv_obj_align(btn_home, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+    lv_obj_t *label_core_num = create_label(scr_misc, "Core Number: %d", get_core_num());
+    lv_obj_align(label_core_num, LV_ALIGN_TOP_LEFT, 10, 60);
+
+    lv_obj_t *label_cpu_speed = create_label(scr_misc, "CPU clock: %d MHz", clock_get_hz(clk_sys) / 1000000);
+    lv_obj_align(label_cpu_speed, LV_ALIGN_TOP_LEFT, 10, 60 + 20);
+
+    lv_obj_t *label_peri_speed = create_label(scr_misc, "Periph clock: %d MHz", clock_get_hz(clk_peri) / 1000000);
+    lv_obj_align(label_peri_speed, LV_ALIGN_TOP_LEFT, 10, 60 + 20 + 20);
+
+    lv_obj_t *label_chip_version = create_label(scr_misc, "Chip Version: 0x%02x", rp2040_chip_version());
+    lv_obj_align(label_chip_version, LV_ALIGN_TOP_LEFT, 10, 60 + 20 + 20 + 20);
+
+    lv_obj_t *label_rom_version = create_label(scr_misc, "Rom Version: 0x%02x", rp2040_rom_version());
+    lv_obj_align(label_rom_version, LV_ALIGN_TOP_LEFT, 10, 60 + 20 + 20 + 20 + 20);
+
     return 0;
 }
-
 
 static void btnmatrix_event_handler(lv_event_t * e)
 {
@@ -208,9 +237,18 @@ static void btnmatrix_event_handler(lv_event_t * e)
                 dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_GREEN);
             } else if (dsc->id == 1 && test_touch_passed) {
                 dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_GREEN);
-            } else if (dsc->id == 2 && test_stress_passed) {
+            } else if (dsc->id == 2 && test_misc_passed) {
                 dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_GREEN);
             }
+
+            if (dsc->id == 0 && !test_bl_passed)  {
+                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_RED);
+            } else if (dsc->id == 1 && !test_touch_passed) {
+                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_RED);
+            } else if (dsc->id == 2 && !test_misc_passed) {
+                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_RED);
+            }
+
         }
     }
 
@@ -226,15 +264,15 @@ static void btnmatrix_event_handler(lv_event_t * e)
             LV_LOG_USER("Touch was pressed\n");
             lv_scr_load(scr_touch);
         }
-        else if (strcmp(txt, "Stress") == 0) {
-            LV_LOG_USER("Stress was pressed\n");
-            lv_scr_load(scr_stress);
+        else if (strcmp(txt, "Misc") == 0) {
+            LV_LOG_USER("misc was pressed\n");
+            lv_scr_load(scr_misc);
         }
     }
 }
 
 static const char * btnm_map[] = {
-    "Backlight", "Touch", "Stress", "",
+    "Backlight", "Touch", "Misc", "",
 };
 
 int factory_test(void)
@@ -245,21 +283,29 @@ int factory_test(void)
     
     scr_backlight_init();
     scr_touch_init();
-    scr_stress_init();
+    scr_misc_init();
 
     lv_obj_t *label = lv_label_create(scr_home);
     lv_label_set_text(label, "Factory Test Suit");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
-    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 20);
+    lv_obj_set_style_text_font(label, font_large, 0);
+    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 10);
+
+    char serial[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+    pico_get_unique_board_id_string(serial, sizeof(serial));
+    lv_obj_t *label_serial = lv_label_create(scr_home);
+    lv_label_set_text_fmt(label_serial, "unique_board_id : 0x%s", serial);
+    lv_obj_set_style_text_font(label_serial, font_large, 0);
+    lv_obj_align_to(label_serial, label, LV_ALIGN_TOP_MID, 0, 25);
+    lv_obj_set_style_text_color(label_serial, lv_palette_main(LV_PALETTE_RED), 0);
 
     btnm1_home = lv_btnmatrix_create(scr_home);
     lv_btnmatrix_set_map(btnm1_home, btnm_map);
     lv_obj_set_size(btnm1_home, 460, 200);
-    lv_obj_set_style_text_font(btnm1_home, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(btnm1_home, font_large, 0);
     lv_obj_add_event_cb(btnm1_home, btnmatrix_event_handler, LV_EVENT_ALL, NULL);
     lv_obj_center(btnm1_home);
 
-    lv_obj_t *btn_home = create_btn(scr_home, LV_SYMBOL_HOME, btn_home_event_handler);
+    lv_obj_t *btn_home = create_btn(scr_home, "Home", btn_home_event_handler);
     lv_obj_align(btn_home, LV_ALIGN_BOTTOM_MID, 0, -10);
 
     return 0;

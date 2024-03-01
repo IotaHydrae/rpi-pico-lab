@@ -15,10 +15,15 @@ SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--prin
 
 include_directories(./ include)
 
+# sys_clk refinement
+set(SYS_CLK_KHZ 360000)
+set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
+
 add_subdirectory(lvgl)
 add_subdirectory(pio)
 add_subdirectory(factory)
 
+# lv_conf.h need pico header files
 target_link_libraries(lvgl PRIVATE pico_stdlib)
 
 file(GLOB_RECURSE COMMON_SOURCES
@@ -46,6 +51,22 @@ else(DISP_OVER_PIO)
         hardware_i2c factory_test
         lvgl lvgl::demos lvgl::examples)
 endif(DISP_OVER_PIO)
+
+# add clk defines here
+target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_SYS_CLK_KHZ=${SYS_CLK_KHZ})
+target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PERI_CLK_KHZ=${PERI_CLK_KHZ})
+target_compile_definitions(pio_i80 PUBLIC DEFAULT_PIO_CLK_KHZ=${PERI_CLK_KHZ})
+
+# Note: If you are using a NOR flash like "w25q16". Just keep the following content.
+# The maximum speed of "w25q16" is 133MHz, However, the clock speed of XIP QSPI is divided from "sys_clk".
+# So, when your "sys_clk" is greater than 266MHz and default PICO_FLASH_SPI_CLKDIV=2, It will exceed the
+# maximum speed, because PICO_FLASH_SPI_CLKDIV must be even, So 4 is good for most purpose, Otherwise,
+# nothing should be done. These things will only useful when you overclocking the rp2040.
+if(${SYS_CLK_KHZ} GREATER 266000)
+    target_compile_definitions(bs2_default PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+else()
+    target_compile_definitions(bs2_default PRIVATE PICO_FLASH_SPI_CLKDIV=2)
+endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC .)
 
