@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.13)
 
+# Set all global variables here
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# SYS_CLK | FLASH_SPI_CLK
+# 360MHz  |  90MHz   (some devices may fail)
+# 266MHz  |  133MHz  (should stable on most devices)
+set(SYS_CLK_KHZ 266000)
+set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
+set(DISP_OVER_PIO true BOOL "Use PIO for flushing display")
+
 # initialize the SDK based on PICO_SDK_PATH
 # note: this must happen before project()
 include(pico_sdk_import.cmake)
@@ -15,17 +23,14 @@ SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--prin
 
 include_directories(./ include)
 
-# sys_clk refinement
-set(SYS_CLK_KHZ 360000)
-set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
-
 add_subdirectory(lvgl)
 add_subdirectory(pio)
 add_subdirectory(factory)
 
-# lv_conf.h need pico header files
+# lv_conf.h need pico header files. the custom tick
 target_link_libraries(lvgl PRIVATE pico_stdlib)
 
+# user define common source files
 file(GLOB_RECURSE COMMON_SOURCES
     main.c
     ft6236.c

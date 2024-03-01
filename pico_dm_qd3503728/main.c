@@ -39,7 +39,11 @@ int main(void)
 {
     /* NOTE: DO NOT MODIFY THIS BLOCK */
 #define CPU_SPEED_MHZ (DEFAULT_SYS_CLK_KHZ / 1000)
-    vreg_set_voltage(VREG_VOLTAGE_1_20);
+    if(CPU_SPEED_MHZ > 266)
+        vreg_set_voltage(VREG_VOLTAGE_1_20);
+    else
+        vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
+
     set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
     clock_configure(clk_peri,
                     0,
@@ -57,11 +61,11 @@ int main(void)
 
     printf("Starting demo\n");
     // lv_demo_widgets();
-    // lv_demo_stress();
+    lv_demo_stress();
     // lv_demo_music();
 
     /* measure weighted fps and opa speed */
-    lv_demo_benchmark();
+    // lv_demo_benchmark();
 
     // factory_test();
 

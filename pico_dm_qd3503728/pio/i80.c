@@ -1,14 +1,16 @@
 #include <stdio.h>
 
-#include "boards/pico.h"
-#include "hardware/gpio.h"
-#include "pico/platform.h"
+#include "pico/time.h"
 #include "pico/stdlib.h"
+#include "pico/platform.h"
+
+#include "hardware/dma.h"
 #include "hardware/pio.h"
+#include "hardware/gpio.h"
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
-#include "hardware/dma.h"
-#include "pico/time.h"
+
+#include "boards/pico.h"
 
 #define USE_DMA 1
 
