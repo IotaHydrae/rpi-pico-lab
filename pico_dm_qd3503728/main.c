@@ -78,18 +78,18 @@ int main(void)
     lv_port_indev_init();
 
     printf("Starting demo\n");
-    lv_demo_widgets();
+    // lv_demo_widgets();
     // lv_demo_stress();
     // lv_demo_music();
 
     /* measure weighted fps and opa speed */
-    // lv_demo_benchmark();
+    lv_demo_benchmark();
 
     /* This is a factory test app */
     // factory_test();
 
     struct repeating_timer timer;
-    add_repeating_timer_ms(5, lv_tick_timer_callback, NULL, &timer);
+    add_repeating_timer_ms(1, lv_tick_timer_callback, NULL, &timer);
 
     sleep_ms(10);
     backlight_init();

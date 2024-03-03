@@ -85,23 +85,75 @@ struct ili9488_priv {
     struct ili9488_display           *display;
 } g_priv;
 
-static inline void dm_gpio_set_value(int *pin, int val)
-{
-    gpio_put(*pin, val);
-}
+#define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
+#define dm_gpio_set_value(p,v) gpio_put(p, v)
+#define mdelay(v) sleep_ms(v)
 
-static inline void mdelay(int val)
-{
-    sleep_ms(val);
-}
-
+extern int i80_pio_init(uint8_t db_base, uint8_t db_count, uint8_t pin_wr);
 extern int i80_write_buf_rs(void *buf, size_t len, bool rs);
-/* rs=0 means writing register, rs=1 means writing data */
-static int write_buf_rs(struct ili9488_priv *priv, void *buf, size_t len, int rs)
+
+static void fbtft_write_gpio16_wr(struct ili9488_priv *priv, void *buf, size_t len)
 {
-    i80_write_buf_rs(buf, len, rs);
-    return 0;
+    u16 data;
+    int i;
+#ifndef DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
+    static u16 prev_data;
+#endif
+
+    /* Start writing by pulling down /WR */
+    dm_gpio_set_value(priv->gpio.wr, 1);
+
+    while (len) {
+        data = *(u16 *)buf;
+        
+        /* Start writing by pulling down /WR */
+        dm_gpio_set_value(priv->gpio.wr, 0);
+
+        // printf("data : 0x%x\n", data);
+        
+        /* Set data */
+#ifndef DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
+        if (data == prev_data) {
+            dm_gpio_set_value(priv->gpio.wr, 1); /* used as delay */
+        } else {
+            for (i = 0; i < 16; i++) {
+                if ((data & 1) != (prev_data & 1))
+                    dm_gpio_set_value(priv->gpio.db[i],
+                                      data & 1);
+                data >>= 1;
+                prev_data >>= 1;
+            }
+        }
+#else
+        for (i = 0; i < 16; i++) {
+            dm_gpio_set_value(&priv->gpio.db[i], data & 1);
+            data >>= 1;
+        }
+#endif
+        
+        /* Pullup /WR */
+        dm_gpio_set_value(priv->gpio.wr, 1);
+        
+#ifndef DO_NOT_OPTIMIZE_FBTFT_WRITE_GPIO
+        prev_data = *(u16 *)buf;
+#endif
+        buf += 2;
+        len -= 2;
+    }
 }
+
+static void fbtft_write_gpio16_wr_rs(struct ili9488_priv *priv, void *buf, size_t len, bool rs)
+{
+    dm_gpio_set_value(priv->gpio.rs, rs);
+    fbtft_write_gpio16_wr(priv, buf, len);
+}
+
+/* rs=0 means writing register, rs=1 means writing data */
+#if DISP_OVER_PIO
+    #define write_buf_rs(p, b, l, r) i80_write_buf_rs(b, l, r)
+#else
+    #define write_buf_rs(p, b, l, r) fbtft_write_gpio16_wr_rs(p, b, l, r)
+#endif
 
 static int ili9488_write_reg(struct ili9488_priv *priv, int len, ...)
 {
@@ -135,11 +187,11 @@ static int ili9488_write_reg(struct ili9488_priv *priv, int len, ...)
 
 static int ili9488_reset(struct ili9488_priv *priv)
 {
-    dm_gpio_set_value(&priv->gpio.reset, 1);
+    dm_gpio_set_value(priv->gpio.reset, 1);
     mdelay(10);
-    dm_gpio_set_value(&priv->gpio.reset, 0);
+    dm_gpio_set_value(priv->gpio.reset, 0);
     mdelay(10);
-    dm_gpio_set_value(&priv->gpio.reset, 1);
+    dm_gpio_set_value(priv->gpio.reset, 1);
     mdelay(10);
     return 0;
 }
@@ -250,11 +302,11 @@ static const struct ili9488_operations default_ili9488_ops = {
     .set_addr_win    = ili9488_set_addr_win,
 };
 
-#define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 static int ili9488_gpio_init(struct ili9488_priv *priv)
 {
     printf("initializing gpios...\n");
 
+#if DISP_OVER_PIO
     gpio_init(priv->gpio.reset);
     // gpio_init(priv->gpio.bl);
     // gpio_init(priv->gpio.cs);
@@ -266,19 +318,29 @@ static int ili9488_gpio_init(struct ili9488_priv *priv)
     // gpio_set_dir(priv->gpio.cs, GPIO_OUT);
     gpio_set_dir(priv->gpio.rs, GPIO_OUT);
     // gpio_set_dir(priv->gpio.rd, GPIO_OUT);
+#else
+    int *pp = (int *)&priv->gpio;
 
+    int len = sizeof(priv->gpio)/sizeof(priv->gpio.reset);
+
+    while(len--) {
+        gpio_init(*pp);
+        gpio_set_dir(*pp, GPIO_OUT);
+        pp++;
+    }
+#endif
     return 0;
 }
 
-int i80_pio_init(uint8_t db_base, uint8_t db_count, uint8_t pin_wr);
 static int ili9488_hw_init(struct ili9488_priv *priv)
 {
     int ret;
 
     printf("initializing hardware...\n");
 
+#if DISP_OVER_PIO
     i80_pio_init(priv->gpio.db[0], ARRAY_SIZE(priv->gpio.db), priv->gpio.wr);
-
+#endif
     ili9488_gpio_init(priv);
 
     priv->tftops->init_display(priv);
@@ -295,18 +357,16 @@ static struct ili9488_display default_ili9488_display = {
     .rotate = 0,
 };
 
-static int ili9488_video_sync(struct ili9488_priv *priv, int xs, int ys, int xe, int ye, void *vmem16, size_t len)
+static void ili9488_video_sync(struct ili9488_priv *priv, int xs, int ys, int xe, int ye, void *vmem16, size_t len)
 {
     // pr_debug("video sync: xs=%d, ys=%d, xe=%d, ye=%d, len=%d\n", xs, ys, xe, ye, len);
     priv->tftops->set_addr_win(priv, xs, ys, xe, ye);
     write_buf_rs(priv, vmem16, len * 2, 1);
-    return 0;
 }
 
-int ili9488_video_flush(int xs, int ys, int xe, int ye, void *vmem16, uint32_t len)
+void ili9488_video_flush(int xs, int ys, int xe, int ye, void *vmem16, uint32_t len)
 {
     ili9488_video_sync(&g_priv, xs, ys, xe, ye, vmem16, len);
-    return 0;
 }
 
 #define BUF_SIZE 64

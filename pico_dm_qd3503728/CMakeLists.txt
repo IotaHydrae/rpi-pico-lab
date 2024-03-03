@@ -38,7 +38,7 @@ if(OVERCLOCK_ENABLED)
     #  2  | 240MHz  |  120MHZ   |  1.10(V) (more stable)
     #  3  | 360MHz  |  90MHz    |  1.20(V)
     #  4  | 400MHz  |  100MHz   |  1.25(V)
-    set(OVERCLOCK_PROFILE 1)
+    set(OVERCLOCK_PROFILE 4)
 
     if(OVERCLOCK_PROFILE EQUAL 1)
         set(SYS_CLK_KHZ 266000)             # CPU clock speed
@@ -98,12 +98,13 @@ target_compile_definitions(pio_i80 PUBLIC DEFAULT_PIO_CLK_KHZ=${PERI_CLK_KHZ})
 # include factory test library here
 add_subdirectory(factory)
 
-# lv_conf.h need pico header files e.g. the custom tick 
+# lv_conf.h need pico header files e.g. the custom tick
 target_link_libraries(lvgl PRIVATE pico_stdlib)
 
 # user define common source files
 file(GLOB_RECURSE COMMON_SOURCES
     main.c
+    ili9488.c
     ft6236.c
     porting/lv_port_disp_template.c
     porting/lv_port_indev_template.c
@@ -112,22 +113,13 @@ file(GLOB_RECURSE COMMON_SOURCES
 )
 
 # rest of your project
-if (DISP_OVER_PIO)
-    add_executable(${PROJECT_NAME} ili9488_pio.c ${COMMON_SOURCES})
-    target_link_libraries(${PROJECT_NAME}
-        pico_bootsel_via_double_reset 
-        pico_stdlib hardware_pwm 
-        hardware_i2c pio_i80 factory_test
-        lvgl lvgl::demos lvgl::examples)
-else(DISP_OVER_PIO)
-    add_executable(${PROJECT_NAME} ili9488_gpio.c ${COMMON_SOURCES})
-    target_link_libraries(${PROJECT_NAME}
+add_executable(${PROJECT_NAME} ${COMMON_SOURCES})
+target_link_libraries(${PROJECT_NAME}
         pico_bootsel_via_double_reset
         pico_stdlib hardware_pwm
-        hardware_i2c factory_test
-        lvgl lvgl::demos lvgl::examples)
-endif(DISP_OVER_PIO)
-
+        hardware_i2c pio_i80 factory_test
+        lvgl lvgl::demos lvgl::examples
+)
 target_include_directories(${PROJECT_NAME} PUBLIC .)
 
 # add target common defines here
@@ -140,6 +132,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_WR=${LCD_PIN_WR})
 target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_RS=${LCD_PIN_RS})
 target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_RST=${LCD_PIN_RST})
 target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_BL=${LCD_PIN_BL})
+target_compile_definitions(${PROJECT_NAME} PUBLIC DISP_OVER_PIO=${DISP_OVER_PIO})
 
 # Note: If you are using a NOR flash like "w25q16". Just keep the following content.
 # The maximum speed of "w25q16" is 133MHz, However, the clock speed of XIP QSPI is divided from "sys_clk".
