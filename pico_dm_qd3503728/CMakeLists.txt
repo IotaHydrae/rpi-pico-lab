@@ -33,10 +33,11 @@ set(OVERCLOCK_ENABLED 1)    # 1: enable, 0: disable
 if(OVERCLOCK_ENABLED)
     message(WARNING "Overclocking is enabled. This may damage your device. Use at your own risk.")
     # Overclocking profiles
-    #      SYS_CLK  | FLASH_SPI_CLK
-    #  1  | 266MHz  |  133MHz  (default, stable, recommended for most devices)
-    #  2  | 240MHz  |  120MHZ  (more stable)
-    #  3  | 360MHz  |  90MHz   (some devices may fail)
+    #      SYS_CLK  | FLASH_CLK | Voltage
+    #  1  | 266MHz  |  133MHz   |  1.10(V) (default, stable, recommended for most devices)
+    #  2  | 240MHz  |  120MHZ   |  1.10(V) (more stable)
+    #  3  | 360MHz  |  90MHz    |  1.20(V)
+    #  4  | 400MHz  |  100MHz   |  1.25(V)
     set(OVERCLOCK_PROFILE 1)
 
     if(OVERCLOCK_PROFILE EQUAL 1)
@@ -47,6 +48,9 @@ if(OVERCLOCK_ENABLED)
         set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
     elseif(OVERCLOCK_PROFILE EQUAL 3)
         set(SYS_CLK_KHZ 360000)
+        set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
+    elseif(OVERCLOCK_PROFILE EQUAL 4)
+        set(SYS_CLK_KHZ 400000)
         set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
     else()
         message(FATAL_ERROR "Invalid overclocking profile")
@@ -143,10 +147,14 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_BL=${LCD_PIN_BL})
 # maximum speed, because PICO_FLASH_SPI_CLKDIV must be even, So 4 is good for most purpose, Otherwise,
 # nothing should be done. These things will only useful when you overclocking the rp2040.
 if(${SYS_CLK_KHZ} GREATER 266000)
-    target_compile_definitions(bs2_default PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+    set(PICO_FLASH_SPI_CLKDIV 4)
 else()
-    target_compile_definitions(bs2_default PRIVATE PICO_FLASH_SPI_CLKDIV=2)
+    set(PICO_FLASH_SPI_CLKDIV 2)
 endif()
+math(EXPR FLASH_CLK_KHZ "${SYS_CLK_KHZ} / ${PICO_FLASH_SPI_CLKDIV}")
+target_compile_definitions(bs2_default PRIVATE PICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV})
+target_compile_definitions(${PROJECT_NAME} PRIVATE FLASH_CLK_KHZ=${FLASH_CLK_KHZ})
+
 
 pico_enable_stdio_usb(${PROJECT_NAME} 0)    # 0: disable, 1: enable
 pico_enable_stdio_uart(${PROJECT_NAME} 1)   # 0: disable, 1: enable

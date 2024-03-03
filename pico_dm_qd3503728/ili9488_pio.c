@@ -77,7 +77,7 @@ struct ili9488_priv {
         int wr;   /* write signal */
         int rd;   /* read signal */
         int bl;   /* backlight */
-        int db[16];
+        int db[LCD_PIN_DB_COUNT];
     } gpio;
     
     /* device specific */
@@ -327,7 +327,7 @@ static int ili9488_probe(struct ili9488_priv *priv)
     priv->gpio.cs    = LCD_PIN_CS;
 
     /* pin0 - pin15 for I8080 data bus */
-    for (int i = 0; i < ARRAY_SIZE(priv->gpio.db); i++)
+    for (int i = LCD_PIN_DB_BASE; i < ARRAY_SIZE(priv->gpio.db); i++)
         priv->gpio.db[i] = i;
 
     ili9488_hw_init(priv);

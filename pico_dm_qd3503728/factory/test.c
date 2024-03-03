@@ -217,16 +217,19 @@ static int scr_misc_init(void)
     lv_obj_align(label_core_num, LV_ALIGN_TOP_LEFT, 10, 60);
 
     lv_obj_t *label_cpu_speed = create_label(scr_misc, "CPU clock: %d MHz", clock_get_hz(clk_sys) / 1000000);
-    lv_obj_align(label_cpu_speed, LV_ALIGN_TOP_LEFT, 10, 60 + 20);
+    lv_obj_align_to(label_cpu_speed, label_core_num, LV_ALIGN_TOP_LEFT, 0, 20);
 
     lv_obj_t *label_peri_speed = create_label(scr_misc, "Periph clock: %d MHz", clock_get_hz(clk_peri) / 1000000);
-    lv_obj_align(label_peri_speed, LV_ALIGN_TOP_LEFT, 10, 60 + 20 + 20);
+    lv_obj_align_to(label_peri_speed, label_cpu_speed, LV_ALIGN_TOP_LEFT, 0, 20);
+
+    lv_obj_t *label_flash_speed = create_label(scr_misc, "Flash clock: %d MHz", FLASH_CLK_KHZ / 1000);
+    lv_obj_align_to(label_flash_speed, label_peri_speed, LV_ALIGN_TOP_LEFT, 0, 20);
 
     lv_obj_t *label_chip_version = create_label(scr_misc, "Chip Version: 0x%02x", rp2040_chip_version());
-    lv_obj_align(label_chip_version, LV_ALIGN_TOP_LEFT, 10, 60 + 20 + 20 + 20);
+    lv_obj_align_to(label_chip_version, label_flash_speed, LV_ALIGN_TOP_LEFT, 0, 20);
 
     lv_obj_t *label_rom_version = create_label(scr_misc, "Rom Version: 0x%02x", rp2040_rom_version());
-    lv_obj_align(label_rom_version, LV_ALIGN_TOP_LEFT, 10, 60 + 20 + 20 + 20 + 20);
+    lv_obj_align_to(label_rom_version, label_chip_version, LV_ALIGN_TOP_LEFT, 0, 20);
 
     return 0;
 }

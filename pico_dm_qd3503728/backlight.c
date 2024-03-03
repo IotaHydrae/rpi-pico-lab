@@ -31,8 +31,12 @@
 #define BL_LVL_OFFSET 5
 
 struct backlight_device {
-    uint8_t bl_pin;
+    const uint8_t bl_pin;
     uint8_t bl_lvl;
+
+    const uint8_t bl_lvl_min;
+    const uint8_t bl_lvl_max;
+    uint8_t bl_lvl_offset;
 } g_bl_priv;
 
 static uint8_t g_bl_lvl = 100;
