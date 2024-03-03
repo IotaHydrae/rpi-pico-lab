@@ -19,52 +19,15 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#include <stdio.h>
-#include "hardware/gpio.h"
-#include "hardware/pwm.h"
+#ifndef __ILI9488_H
+#define __ILI9488_H
 
-#include "backlight.h"
+#include <stdint.h>
 
-#define BL_LVL_MIN 0
-#define BL_LVL_MAX 100
+#define ILI9488_X_RES 480
+#define ILI9488_Y_RES 320
 
-#define BL_LVL_OFFSET 5
+extern int ili9488_driver_init();
+extern int ili9488_video_flush(int xs, int ys, int xe, int ye, void *vmem16, uint32_t len);
 
-struct backlight_device {
-    uint8_t bl_pin;
-    uint8_t bl_lvl;
-} g_bl_priv;
-
-static uint8_t g_bl_lvl = 100;
-
-void backlight_set_level(uint8_t level)
-{
-    /* we shouldn't set backlight percent to 0%, otherwise we can't see nothing */
-    uint8_t percent = (level + BL_LVL_OFFSET) > 100 ? 100 : (level + BL_LVL_OFFSET);
-
-    /* To pwm level */
-    uint16_t pwm_lvl = (percent * 65535 / 100);
-    pwm_set_gpio_level(LCD_PIN_BL, pwm_lvl);
-
-    g_bl_lvl = percent;
-}
-
-uint8_t backlight_get_level(void)
-{
-    return g_bl_lvl;
-}
-
-void backlight_init(void)
-{
-    gpio_init(LCD_PIN_BL);
-    gpio_set_function(LCD_PIN_BL, GPIO_FUNC_PWM);
-
-    uint slice_num = pwm_gpio_to_slice_num(LCD_PIN_BL);
-
-    pwm_config config = pwm_get_default_config();
-    // Set divider, reduces counter clock to sysclock/this value
-    pwm_config_set_clkdiv(&config, 1.f);
-    pwm_init(slice_num, &config, true);
-
-    pwm_set_gpio_level(LCD_PIN_BL, 0);
-}
+#endif

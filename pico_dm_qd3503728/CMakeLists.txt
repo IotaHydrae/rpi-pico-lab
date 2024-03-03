@@ -1,18 +1,77 @@
+# Copyright (c) 2024 embeddedboys developers
+
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# This is the main CMakeLists file of the project. It is used to build the project
+# using the CMake build system. You can find the documentation of CMake at
+# https:#cmake.org/cmake/help/latest/index.html
+
 cmake_minimum_required(VERSION 3.13)
 
 # Set all global variables here
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# SYS_CLK | FLASH_SPI_CLK
-# 360MHz  |  90MHz   (some devices may fail)
-# 266MHz  |  133MHz  (should stable on most devices)
-set(SYS_CLK_KHZ 266000)
-set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
-set(DISP_OVER_PIO true BOOL "Use PIO for flushing display")
+
+set(OVERCLOCK_ENABLED 1)    # 1: enable, 0: disable
+
+if(OVERCLOCK_ENABLED)
+    message(WARNING "Overclocking is enabled. This may damage your device. Use at your own risk.")
+    # Overclocking profiles
+    #      SYS_CLK  | FLASH_SPI_CLK
+    #  1  | 266MHz  |  133MHz  (default, stable, recommended for most devices)
+    #  2  | 240MHz  |  120MHZ  (more stable)
+    #  3  | 360MHz  |  90MHz   (some devices may fail)
+    set(OVERCLOCK_PROFILE 1)
+
+    if(OVERCLOCK_PROFILE EQUAL 1)
+        set(SYS_CLK_KHZ 266000)             # CPU clock speed
+        set(PERI_CLK_KHZ ${SYS_CLK_KHZ})    # Peripheral clock speed
+    elseif(OVERCLOCK_PROFILE EQUAL 2)
+        set(SYS_CLK_KHZ 240000)
+        set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
+    elseif(OVERCLOCK_PROFILE EQUAL 3)
+        set(SYS_CLK_KHZ 360000)
+        set(PERI_CLK_KHZ ${SYS_CLK_KHZ})
+    else()
+        message(FATAL_ERROR "Invalid overclocking profile")
+    endif()
+else()
+    message(WARNING "Overclocking is disabled.")
+    set(SYS_CLK_KHZ 125000) # CPU clock speed
+    set(PERI_CLK_KHZ ${SYS_CLK_KHZ})    # Peripheral clock speed
+endif()
+
+# LCD Pins for 8080 interface
+set(LCD_PIN_DB_BASE  0)  # 8080 LCD data bus base pin
+set(LCD_PIN_DB_COUNT 16) # 8080 LCD data bus pin count
+set(LCD_PIN_CS  18)  # 8080 LCD chip select pin
+set(LCD_PIN_WR  19)  # 8080 LCD write pin
+set(LCD_PIN_RS  20)  # 8080 LCD register select pin
+set(LCD_PIN_RST 22)  # 8080 LCD reset pin
+set(LCD_PIN_BL  28)  # 8080 LCD backlight pin
+set(DISP_OVER_PIO 1) # 1: PIO, 0: GPIO
 
 # initialize the SDK based on PICO_SDK_PATH
 # note: this must happen before project()
 include(pico_sdk_import.cmake)
 
+# set the project name
 project(pico_dm_qd3503728)
 
 # initialize the Raspberry Pi Pico SDK
@@ -23,11 +82,19 @@ SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--prin
 
 include_directories(./ include)
 
+# add lvgl library here
 add_subdirectory(lvgl)
+
+# include PIO library here
 add_subdirectory(pio)
+target_compile_definitions(pio_i80 PUBLIC LCD_PIN_RS=${LCD_PIN_RS})
+target_compile_definitions(pio_i80 PUBLIC LCD_PIN_CS=${LCD_PIN_CS})
+target_compile_definitions(pio_i80 PUBLIC DEFAULT_PIO_CLK_KHZ=${PERI_CLK_KHZ})
+
+# include factory test library here
 add_subdirectory(factory)
 
-# lv_conf.h need pico header files. the custom tick
+# lv_conf.h need pico header files e.g. the custom tick 
 target_link_libraries(lvgl PRIVATE pico_stdlib)
 
 # user define common source files
@@ -49,7 +116,7 @@ if (DISP_OVER_PIO)
         hardware_i2c pio_i80 factory_test
         lvgl lvgl::demos lvgl::examples)
 else(DISP_OVER_PIO)
-    add_executable(${PROJECT_NAME} ili9488_gpio.c ${LVGL_SOURCES} ${COMMON_SOURCES})
+    add_executable(${PROJECT_NAME} ili9488_gpio.c ${COMMON_SOURCES})
     target_link_libraries(${PROJECT_NAME}
         pico_bootsel_via_double_reset
         pico_stdlib hardware_pwm
@@ -57,10 +124,18 @@ else(DISP_OVER_PIO)
         lvgl lvgl::demos lvgl::examples)
 endif(DISP_OVER_PIO)
 
-# add clk defines here
+target_include_directories(${PROJECT_NAME} PUBLIC .)
+
+# add target common defines here
 target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_SYS_CLK_KHZ=${SYS_CLK_KHZ})
 target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PERI_CLK_KHZ=${PERI_CLK_KHZ})
-target_compile_definitions(pio_i80 PUBLIC DEFAULT_PIO_CLK_KHZ=${PERI_CLK_KHZ})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_DB_BASE=${LCD_PIN_DB_BASE})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_DB_COUNT=${LCD_PIN_DB_COUNT})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_CS=${LCD_PIN_CS})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_WR=${LCD_PIN_WR})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_RS=${LCD_PIN_RS})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_RST=${LCD_PIN_RST})
+target_compile_definitions(${PROJECT_NAME} PUBLIC LCD_PIN_BL=${LCD_PIN_BL})
 
 # Note: If you are using a NOR flash like "w25q16". Just keep the following content.
 # The maximum speed of "w25q16" is 133MHz, However, the clock speed of XIP QSPI is divided from "sys_clk".
@@ -73,17 +148,16 @@ else()
     target_compile_definitions(bs2_default PRIVATE PICO_FLASH_SPI_CLKDIV=2)
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC .)
-
-pico_enable_stdio_usb(${PROJECT_NAME} 0)
-pico_enable_stdio_uart(${PROJECT_NAME} 1)
+pico_enable_stdio_usb(${PROJECT_NAME} 0)    # 0: disable, 1: enable
+pico_enable_stdio_uart(${PROJECT_NAME} 1)   # 0: disable, 1: enable
 
 pico_add_extra_outputs(${PROJECT_NAME})
 
+# show target size info
 add_custom_target(
     print-memory-usage ALL
     COMMAND arm-none-eabi-size -G ${CMAKE_PROJECT_NAME}.elf
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/build/${CMAKE_PROJECT_NAME}.elf
-    COMMENT "Print memory usage"
+    COMMENT "Print target size info"
     DEPENDS ${PROJECT_NAME}
 )

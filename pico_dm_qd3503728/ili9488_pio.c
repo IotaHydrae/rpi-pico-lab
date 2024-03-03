@@ -1,13 +1,23 @@
-// SPDX-License-Identifier: GPL-2.0+
-/*
- * (C) 2023 Iota Hydrae <writeforever@foxmail.com>
- */
+// Copyright (c) 2024 embeddedboys developers
 
-/*
- * Support for the ili9488
- * Note: This is a GPIO based driver, the most obvious
- * problem is the lag of refresh
- */
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "pico/platform.h"
 #include "pico/time.h"
@@ -272,6 +282,7 @@ static int ili9488_hw_init(struct ili9488_priv *priv)
     ili9488_gpio_init(priv);
 
     priv->tftops->init_display(priv);
+    /* clear screen to black */
     // priv->tftops->clear(priv, 0x0);
 
     return 0;
@@ -308,12 +319,12 @@ static int ili9488_probe(struct ili9488_priv *priv)
     priv->display = &default_ili9488_display;
     priv->tftops = &default_ili9488_ops;
 
-    priv->gpio.bl    = 28;
-    priv->gpio.reset = 22;
+    priv->gpio.bl    = LCD_PIN_BL;
+    priv->gpio.reset = LCD_PIN_RST;
     // priv->gpio.rd    = 21;
-    priv->gpio.rs    = 20;
-    priv->gpio.wr    = 19;
-    // priv->gpio.cs    = 18;
+    priv->gpio.rs    = LCD_PIN_RS;
+    priv->gpio.wr    = LCD_PIN_WR;
+    priv->gpio.cs    = LCD_PIN_CS;
 
     /* pin0 - pin15 for I8080 data bus */
     for (int i = 0; i < ARRAY_SIZE(priv->gpio.db); i++)
