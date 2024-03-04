@@ -25,50 +25,137 @@
 
 #include "backlight.h"
 
-#define BL_LVL_MIN 0
-#define BL_LVL_MAX 100
+#define BL_LVL_DEF_MIN 0
+#define BL_LVL_DEF_MAX 100
+#define BL_LVL_DEF_OFFSET 5
+#define BL_LVL_DEF_LVL 100
 
-#define BL_LVL_OFFSET 5
+struct backlight_device;
+
+struct backlight_profile {
+    u8 bl_lvl_min;
+    u8 bl_lvl_max;
+    u8 bl_lvl_offs;
+    u8 bl_lvl_default;
+};
+
+struct backlight_ops {
+    void (*hw_init)(struct backlight_device *dev);
+
+    void (*set_lvl)(struct backlight_device *dev, u8 level);
+    u8 (*get_lvl)(struct backlight_device *dev);
+    void (*set_offs)(struct backlight_device *dev, u8 offset);
+    u8 (*get_offs)(struct backlight_device *dev);
+
+    void (*set_min)(struct backlight_device *dev, u8 min);
+    u8 (*get_min)(struct backlight_device *dev);
+
+    void (*set_max)(struct backlight_device *dev, u8 max);
+    u8 (*get_max)(struct backlight_device *dev);
+
+    void (*bl_drv_update_cb)(struct backlight_device *dev);
+};
 
 struct backlight_device {
-    const uint8_t bl_pin;
-    uint8_t bl_lvl;
+    u8 bl_pin;
+    u8 bl_lvl;
 
-    const uint8_t bl_lvl_min;
-    const uint8_t bl_lvl_max;
-    uint8_t bl_lvl_offset;
+    struct backlight_profile prof;
 } g_bl_priv;
 
-static uint8_t g_bl_lvl = 100;
 
-void backlight_set_level(uint8_t level)
+void __bl_set_lvl(struct backlight_device *dev, u8 level)
 {
     /* we shouldn't set backlight percent to 0%, otherwise we can't see nothing */
-    uint8_t percent = (level + BL_LVL_OFFSET) > 100 ? 100 : (level + BL_LVL_OFFSET);
+    u8 percent = (level + dev->prof.bl_lvl_offs) > 100 ? 100 : (level + dev->prof.bl_lvl_offs);
 
     /* To pwm level */
-    uint16_t pwm_lvl = (percent * 65535 / 100);
-    pwm_set_gpio_level(LCD_PIN_BL, pwm_lvl);
+    u16 pwm_lvl = (percent * 65535 / 100);
+    pwm_set_gpio_level(dev->bl_pin, pwm_lvl);
 
-    g_bl_lvl = percent;
+    dev->bl_lvl = percent;
 }
 
-uint8_t backlight_get_level(void)
+void backlight_set_level(u8 level)
 {
-    return g_bl_lvl;
+    __bl_set_lvl(&g_bl_priv, level);
 }
 
-void backlight_init(void)
+static u8 __bl_get_lvl(struct backlight_device *dev)
 {
-    gpio_init(LCD_PIN_BL);
-    gpio_set_function(LCD_PIN_BL, GPIO_FUNC_PWM);
+    return dev->bl_lvl;
+}
 
-    uint slice_num = pwm_gpio_to_slice_num(LCD_PIN_BL);
+u8 backlight_get_level(void)
+{
+    return __bl_get_lvl(&g_bl_priv);
+}
+
+static void __bl_set_offset(struct backlight_device *dev, uint8_t offset)
+{
+    dev->prof.bl_lvl_offs = offset;
+}
+
+void backlight_set_offset(u8 offset)
+{
+    __bl_set_offset(&g_bl_priv, offset);
+}
+
+static u8 __bl_get_offset(struct backlight_device *dev)
+{
+    return dev->prof.bl_lvl_offs;
+}
+
+u8 backlight_get_offset(void)
+{
+    return __bl_get_offset(&g_bl_priv);
+}
+
+static void backlight_hw_init(struct backlight_device *dev)
+{
+    gpio_init(dev->bl_pin);
+    gpio_set_function(dev->bl_pin, GPIO_FUNC_PWM);
+
+    uint slice_num = pwm_gpio_to_slice_num(dev->bl_pin);
 
     pwm_config config = pwm_get_default_config();
     // Set divider, reduces counter clock to sysclock/this value
     pwm_config_set_clkdiv(&config, 1.f);
     pwm_init(slice_num, &config, true);
 
-    pwm_set_gpio_level(LCD_PIN_BL, 0);
+    pwm_set_gpio_level(dev->bl_pin, 0);
+}
+
+struct backlight_profile avaliable_profiles[] = {
+    [0] = {
+        .bl_lvl_min = 0,
+        .bl_lvl_max = 100,
+        .bl_lvl_offs = 5,
+        .bl_lvl_default = 100,
+    },
+};
+
+static void backlight_load_profile(struct backlight_device *dev, struct backlight_profile *profile)
+{
+    dev->prof.bl_lvl_min = profile->bl_lvl_min;
+    dev->prof.bl_lvl_max = profile->bl_lvl_max;
+    dev->prof.bl_lvl_offs = profile->bl_lvl_offs;
+    dev->prof.bl_lvl_default = profile->bl_lvl_default;
+}
+
+struct backlight_profile def_bl_profile = {
+    .bl_lvl_min = BL_LVL_DEF_MIN,
+    .bl_lvl_max = BL_LVL_DEF_MAX,
+    .bl_lvl_offs = BL_LVL_DEF_OFFSET,
+    .bl_lvl_default = BL_LVL_DEF_LVL,
+};
+
+void backlight_driver_init(void)
+{
+    /* make default setting */
+    g_bl_priv.bl_pin = LCD_PIN_BL;
+
+    backlight_load_profile(&g_bl_priv, &def_bl_profile);
+
+    backlight_hw_init(&g_bl_priv);
 }

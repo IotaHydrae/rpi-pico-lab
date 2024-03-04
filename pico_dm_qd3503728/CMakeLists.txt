@@ -152,7 +152,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE FLASH_CLK_KHZ=${FLASH_CLK_KHZ
 pico_enable_stdio_usb(${PROJECT_NAME} 0)    # 0: disable, 1: enable
 pico_enable_stdio_uart(${PROJECT_NAME} 1)   # 0: disable, 1: enable
 
-pico_add_extra_outputs(${PROJECT_NAME})
+pico_add_extra_outputs(${PROJECT_NAME}) # uf2 and more files
 
 # show target size info
 add_custom_target(

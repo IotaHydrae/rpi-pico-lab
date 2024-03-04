@@ -24,8 +24,14 @@
 
 #include <stdint.h>
 
-void backlight_init(void);
-void backlight_set_level(uint8_t level);
-uint8_t backlight_get_level(void);
+typedef unsigned char u8;
+typedef unsigned short u16;
+
+void backlight_driver_init(void);
+void backlight_set_level(u8 level);
+u8 backlight_get_level(void);
+
+u8 backlight_get_offset(void);
+void backlight_set_offset(u8 offset);
 
 #endif
