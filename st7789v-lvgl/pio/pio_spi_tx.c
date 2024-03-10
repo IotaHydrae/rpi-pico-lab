@@ -41,12 +41,12 @@ static PIO g_pio = pio0;
 static uint g_sm = 0;
 
 static inline void __time_critical_func(pio_spi_tx_set_dc_cs)(bool dc, bool cs) {
-    gpio_put_masked((1u << ST7789V_DC_PIN) | (1u << ST7789V_CS_PIN), !!dc << ST7789V_DC_PIN | !!cs << ST7789V_CS_PIN);
+    gpio_put_masked((1u << TFT_DC_PIN) | (1u << TFT_CS_PIN), !!dc << TFT_DC_PIN | !!cs << TFT_CS_PIN);
 }
 
 static inline void __time_critical_func(pio_spi_tx_set_dc)(bool dc)
 {
-    gpio_put(ST7789V_DC_PIN, dc);
+    gpio_put(TFT_DC_PIN, dc);
 }
 
 #if USE_DMA
@@ -97,7 +97,7 @@ int pio_spi_tx_init(uint data_pin, uint clk_pin)
 #endif
 
     uint offset = pio_add_program(g_pio, &pio_spi_tx_program);
-    float clk_div = (DEFAULT_PIO_CLK_KHZ / 2.f / ST7789V_BUS_CLK_KHZ);
+    float clk_div = (DEFAULT_PIO_CLK_KHZ / 2.f / TFT_BUS_CLK_KHZ);
 
     pio_spi_tx_program_init(g_pio, g_sm, offset, data_pin, clk_pin, clk_div);
 }

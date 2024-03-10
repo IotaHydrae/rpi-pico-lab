@@ -43,7 +43,7 @@
 #include "lvgl/examples/lv_examples.h"
 #include "port/lv_port_disp.h"
 
-#define TAG "st7789v: "
+#define TAG "tft: "
 
 #define pr_debug(...) printf(TAG __VA_ARGS__)
 
@@ -51,32 +51,32 @@
 #define dm_gpio_set_value(p,v) gpio_put(p, v)
 #define mdelay(v) busy_wait_ms(v)
 
-#if ST7789V_SPIX == 0
+#if TFT_SPIX == 0
     #define spi_ifce spi0
-#elif ST7789V_SPIX == 1
+#elif TFT_SPIX == 1
     #define spi_ifce spi1
 #else
     #define spi_ifce spi_default
 #endif
 
-static void st7789v_reset()
+static void tft_reset()
 {
     pr_debug("%s\n", __func__);
-    dm_gpio_set_value(ST7789V_RES_PIN, 1);
+    dm_gpio_set_value(TFT_RES_PIN, 1);
     mdelay(10);
-    dm_gpio_set_value(ST7789V_RES_PIN, 0);
+    dm_gpio_set_value(TFT_RES_PIN, 0);
     mdelay(10);
-    dm_gpio_set_value(ST7789V_RES_PIN, 1);
+    dm_gpio_set_value(TFT_RES_PIN, 1);
     mdelay(10);
 }
 
-static void st7789v_spi_write_buf_dc(void *buf, size_t len, bool dc)
+static void tft_spi_write_buf_dc(void *buf, size_t len, bool dc)
 {
-    gpio_put(ST7789V_DC_PIN, dc);
+    gpio_put(TFT_DC_PIN, dc);
 
-    dm_gpio_set_value(ST7789V_CS_PIN, 0);
+    dm_gpio_set_value(TFT_CS_PIN, 0);
     spi_write_blocking(spi_ifce, buf, len);
-    dm_gpio_set_value(ST7789V_CS_PIN, 1);
+    dm_gpio_set_value(TFT_CS_PIN, 1);
 }
 
 #if DISP_OVER_PIO
@@ -84,11 +84,11 @@ extern int pio_spi_tx_init(uint data_pin, uint clk_pin);
 extern void pio_spi_tx_write_buf_dc(void *buf, size_t len, bool dc);
 #define write_buf_dc pio_spi_tx_write_buf_dc
 #else
-#define write_buf_dc st7789v_spi_write_buf_dc
+#define write_buf_dc tft_spi_write_buf_dc
 #endif
 
 static uint8_t reg_buf[64];
-static void st7789v_write_reg(int len, ...)
+static void tft_write_reg(int len, ...)
 {
     uint8_t *buf = reg_buf;
     va_list args;
@@ -115,11 +115,11 @@ exit_no_param:
 }
 #define NUMARGS(...)  (sizeof((int[]){__VA_ARGS__}) / sizeof(int))
 #define write_reg(...) \
-    st7789v_write_reg(NUMARGS(__VA_ARGS__), __VA_ARGS__)
+    tft_write_reg(NUMARGS(__VA_ARGS__), __VA_ARGS__)
 
-static void st7789v_init_display(void)
+static void tft_init_display(void)
 {
-    st7789v_reset();
+    tft_reset();
 
     write_reg(0x11);
     sleep_ms(120);
@@ -164,7 +164,7 @@ static void st7789v_init_display(void)
     write_reg(0x29);
 }
 
-static void st7789v_set_addr_win(int xs, int ys, int xe, int ye)
+static void tft_set_addr_win(int xs, int ys, int xe, int ye)
 {
     /* set column adddress */
     write_reg(0x2A, xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
@@ -176,15 +176,15 @@ static void st7789v_set_addr_win(int xs, int ys, int xe, int ye)
     write_reg(0x2C);
 }
 
-void st7789v_video_flush(int xs, int ys, int xe, int ye, void *vmem16, size_t len)
+void tft_video_flush(int xs, int ys, int xe, int ye, void *vmem16, size_t len)
 {
-    st7789v_set_addr_win(xs, ys, xe, ye);
+    tft_set_addr_win(xs, ys, xe, ye);
     write_buf_dc(vmem16, len, 1);
 }
 
-static void st7789v_set_backlight(uint16_t level)
+static void tft_set_backlight(uint16_t level)
 {
-    pwm_set_gpio_level(ST7789V_BLK_PIN, level * level);
+    pwm_set_gpio_level(TFT_BLK_PIN, level * level);
 }
 
 /**
@@ -212,33 +212,33 @@ static void hardware_init(void)
 
     /* Useing default SPI0 at 62500000 */
 #if DISP_OVER_PIO
-    pio_spi_tx_init(ST7789V_SDA_PIN, ST7789V_SCL_PIN);
-    bi_decl(bi_2pins_with_func(ST7789V_SCL_PIN, ST7789V_SDA_PIN, GPIO_FUNC_PIO0));
+    pio_spi_tx_init(TFT_SDA_PIN, TFT_SCL_PIN);
+    bi_decl(bi_2pins_with_func(TFT_SCL_PIN, TFT_SDA_PIN, GPIO_FUNC_PIO0));
 #else
-    spi_init(spi_ifce, ST7789V_BUS_CLK_KHZ * 1000);
-    gpio_set_function(ST7789V_SCL_PIN, GPIO_FUNC_SPI);
-    gpio_set_function(ST7789V_SDA_PIN, GPIO_FUNC_SPI);
-    bi_decl(bi_2pins_with_func(ST7789V_SCL_PIN, ST7789V_SDA_PIN, GPIO_FUNC_SPI));
+    spi_init(spi_ifce, TFT_BUS_CLK_KHZ * 1000);
+    gpio_set_function(TFT_SCL_PIN, GPIO_FUNC_SPI);
+    gpio_set_function(TFT_SDA_PIN, GPIO_FUNC_SPI);
+    bi_decl(bi_2pins_with_func(TFT_SCL_PIN, TFT_SDA_PIN, GPIO_FUNC_SPI));
     pr_debug("spi%d initialized at %d kHz\n", spi_get_index(spi_ifce), spi_get_baudrate(spi_ifce) / 1000 );
 #endif
 
-    gpio_init(ST7789V_CS_PIN);
-    gpio_set_dir(ST7789V_CS_PIN, GPIO_OUT);
-    gpio_put(ST7789V_CS_PIN, 1);
-    bi_decl(bi_1pin_with_name(ST7789V_CS_PIN, "SPI CS"));
+    gpio_init(TFT_CS_PIN);
+    gpio_set_dir(TFT_CS_PIN, GPIO_OUT);
+    gpio_put(TFT_CS_PIN, 1);
+    bi_decl(bi_1pin_with_name(TFT_CS_PIN, "SPI CS"));
 
-    gpio_init(ST7789V_RES_PIN);
-    gpio_set_dir(ST7789V_RES_PIN, GPIO_OUT);
-    bi_decl(bi_1pin_with_name(ST7789V_RES_PIN, "TFT RES"));
+    gpio_init(TFT_RES_PIN);
+    gpio_set_dir(TFT_RES_PIN, GPIO_OUT);
+    bi_decl(bi_1pin_with_name(TFT_RES_PIN, "TFT RES"));
 
-    gpio_init(ST7789V_DC_PIN);
-    gpio_set_dir(ST7789V_DC_PIN, GPIO_OUT);
-    bi_decl(bi_1pin_with_name(ST7789V_DC_PIN, "TFT DC"));
+    gpio_init(TFT_DC_PIN);
+    gpio_set_dir(TFT_DC_PIN, GPIO_OUT);
+    bi_decl(bi_1pin_with_name(TFT_DC_PIN, "TFT DC"));
 
-    gpio_set_function(ST7789V_BLK_PIN, GPIO_FUNC_PWM);
-    bi_decl(bi_1pin_with_name(ST7789V_BLK_PIN, "TFT BLK"));
+    gpio_set_function(TFT_BLK_PIN, GPIO_FUNC_PWM);
+    bi_decl(bi_1pin_with_name(TFT_BLK_PIN, "TFT BLK"));
 
-    uint32_t slice_num = pwm_gpio_to_slice_num(ST7789V_BLK_PIN);
+    uint32_t slice_num = pwm_gpio_to_slice_num(TFT_BLK_PIN);
     // pwm_clear_irq(slice_num);
     // pwm_set_irq_enabled(slice_num, true);
 
@@ -250,8 +250,8 @@ static void hardware_init(void)
     pwm_config_set_clkdiv(&config, 4.f);
     pwm_init(slice_num, &config, true);
 
-    st7789v_init_display();
-    st7789v_set_backlight(128);
+    tft_init_display();
+    tft_set_backlight(128);
 }
 
 bool lvgl_timer_callback(struct repeating_timer *t)

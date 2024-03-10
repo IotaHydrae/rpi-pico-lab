@@ -36,16 +36,16 @@ else()
 endif()
 
 # LCD Pins for SPI and PIO interface
-set(ST7789V_SPIX      0)    # which spi controller will be used.
-set(ST7789V_SCL_PIN   18)
-set(ST7789V_SDA_PIN   19)
-set(ST7789V_RES_PIN   15)
-set(ST7789V_DC_PIN    14)
-set(ST7789V_CS_PIN    13)
-set(ST7789V_BLK_PIN   12)
-set(ST7789V_HOR_RES   240)
-set(ST7789V_VER_RES   240)
-set(ST7789V_BUS_CLK_KHZ 62500)
+set(TFT_SPIX      0)    # which spi controller will be used.
+set(TFT_SCL_PIN   18)
+set(TFT_SDA_PIN   19)
+set(TFT_RES_PIN   15)
+set(TFT_DC_PIN    14)
+set(TFT_CS_PIN    13)
+set(TFT_BLK_PIN   12)
+set(TFT_HOR_RES   240)
+set(TFT_VER_RES   240)
+set(TFT_BUS_CLK_KHZ 62500)
 set(DISP_OVER_PIO 1)  # 1: PIO, 0: SPI
 
 SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -Wl,--print-memory-usage")
@@ -55,7 +55,7 @@ SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--prin
 # note: this must happen before project()
 include(pico_sdk_import.cmake)
 
-project(st7789v_lvgl)
+project(tft_lvgl)
 
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
@@ -69,9 +69,9 @@ add_subdirectory(lvgl)
 target_link_libraries(lvgl PUBLIC pico_stdlib)
 
 add_subdirectory(pio)
-target_compile_definitions(pio_spi_tx PUBLIC ST7789V_DC_PIN=${ST7789V_DC_PIN})
-target_compile_definitions(pio_spi_tx PUBLIC ST7789V_CS_PIN=${ST7789V_CS_PIN})
-target_compile_definitions(pio_spi_tx PUBLIC ST7789V_BUS_CLK_KHZ=${ST7789V_BUS_CLK_KHZ})
+target_compile_definitions(pio_spi_tx PUBLIC TFT_DC_PIN=${TFT_DC_PIN})
+target_compile_definitions(pio_spi_tx PUBLIC TFT_CS_PIN=${TFT_CS_PIN})
+target_compile_definitions(pio_spi_tx PUBLIC TFT_BUS_CLK_KHZ=${TFT_BUS_CLK_KHZ})
 target_compile_definitions(pio_spi_tx PUBLIC DEFAULT_PIO_CLK_KHZ=${PERI_CLK_KHZ})
 
 # user define common source files
@@ -96,16 +96,16 @@ target_link_libraries(${PROJECT_NAME}
 )
 target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_SYS_CLK_KHZ=${SYS_CLK_KHZ})
 target_compile_definitions(${PROJECT_NAME} PUBLIC DEFAULT_PERI_CLK_KHZ=${PERI_CLK_KHZ})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_SCL_PIN=${ST7789V_SCL_PIN})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_SDA_PIN=${ST7789V_SDA_PIN})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_RES_PIN=${ST7789V_RES_PIN})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_DC_PIN=${ST7789V_DC_PIN})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_CS_PIN=${ST7789V_CS_PIN})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_BLK_PIN=${ST7789V_BLK_PIN})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_HOR_RES=${ST7789V_HOR_RES})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_VER_RES=${ST7789V_VER_RES})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_SPIX=${ST7789V_SPIX})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_BUS_CLK_KHZ=${ST7789V_BUS_CLK_KHZ})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_SCL_PIN=${TFT_SCL_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_SDA_PIN=${TFT_SDA_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_RES_PIN=${TFT_RES_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_DC_PIN=${TFT_DC_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_CS_PIN=${TFT_CS_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_BLK_PIN=${TFT_BLK_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_HOR_RES=${TFT_HOR_RES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_VER_RES=${TFT_VER_RES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_SPIX=${TFT_SPIX})
+target_compile_definitions(${PROJECT_NAME} PUBLIC TFT_BUS_CLK_KHZ=${TFT_BUS_CLK_KHZ})
 target_compile_definitions(${PROJECT_NAME} PUBLIC DISP_OVER_PIO=${DISP_OVER_PIO})
 
 # Note: If you are using a NOR flash like "w25q16". Just keep the following content.
