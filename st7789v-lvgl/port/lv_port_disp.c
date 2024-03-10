@@ -54,9 +54,8 @@ static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-extern void st7789v_draw_pixel_immediately(uint32_t x, uint32_t y, uint16_t color);
-extern void st7789v_draw_pixel(uint32_t x, uint32_t y, uint16_t color);
-extern void st7789v_flush();
+extern void st7789v_write_buf_dc(void *buf, size_t len, bool dc);
+extern void st7789v_set_addr_win(int xs, int ys, int xe, int ye);
 
 void lv_port_disp_init( void )
 {
@@ -90,10 +89,12 @@ void lv_port_disp_init( void )
      *      and you only need to change the frame buffer's address.
      */
 
+#define MY_DISP_BUF_SIZE (MY_DISP_HOR_RES * MY_DISP_VER_RES)
+
     /* Example for 1) */
     static lv_disp_draw_buf_t draw_buf_dsc_1;
-    static lv_color_t buf_1[MY_DISP_HOR_RES * 10];                          /*A buffer for 10 rows*/
-    lv_disp_draw_buf_init(&draw_buf_dsc_1, buf_1, NULL, MY_DISP_HOR_RES * 10);   /*Initialize the display buffer*/
+    static lv_color_t buf_1[MY_DISP_BUF_SIZE];                          /*A buffer for 10 rows*/
+    lv_disp_draw_buf_init(&draw_buf_dsc_1, buf_1, NULL, MY_DISP_BUF_SIZE);   /*Initialize the display buffer*/
 
     /* Example for 2) */
     // static lv_disp_draw_buf_t draw_buf_dsc_2;
@@ -163,28 +164,14 @@ static void disp_exit( void )
     /*You code here*/
 }
 
-extern void st7789v_set_cursor(uint32_t x, uint32_t y);
-extern void st7789v_write_command(uint8_t command);
-extern void st7789v_write_data(uint8_t data);
 /*Flush the content of the internal buffer the specific area on the display
  *You can use DMA or any hardware acceleration to do this operation in the background but
  *'lv_disp_flush_ready()' has to be called when finished.*/
 static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
                         lv_color_t *color_p )
 {
-    /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
-    // int ret;
-    int x, y;
-
-    st7789v_set_cursor(area->x1, area->x2);
-    st7789v_write_command(0x2c);
-    for( y = area->y1; y < area->y2; y++ ) {
-        for( x = area->x1; x < area->x2; x++ ) {
-            st7789v_write_data(color_p->full >> 8);
-            st7789v_write_data(color_p++->full & 0xFF);
-        }
-    }
-    // st7789v_flush();
+    st7789v_set_addr_win(area->x1, area->y1, area->x2, area->y2);
+    st7789v_write_buf_dc((void *)color_p, lv_area_get_size(area) * 2, 1);
 
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
