@@ -246,9 +246,9 @@ int main(void)
     // lv_label_set_text(label, "embeddedboys");
 
     // lv_demo_widgets();
-    lv_demo_stress();
+    // lv_demo_stress();
     // lv_demo_music();
-    // lv_demo_benchmark();
+    lv_demo_benchmark();
 
     struct repeating_timer lvgl_timer;
     add_repeating_timer_ms(1, lvgl_timer_callback, NULL, &lvgl_timer);

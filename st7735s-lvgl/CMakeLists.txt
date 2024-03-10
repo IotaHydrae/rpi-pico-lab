@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(OVERCLOCK_ENABLED 0)    # 1: enable, 0: disable
+set(OVERCLOCK_ENABLED 1)    # 1: enable, 0: disable
 
 if(OVERCLOCK_ENABLED)
     message(WARNING "Overclocking is enabled. This may damage your device. Use at your own risk.")
@@ -12,7 +12,7 @@ if(OVERCLOCK_ENABLED)
     #  2  | 240MHz  |  120MHZ   |  1.10(V) (more stable)
     #  3  | 360MHz  |  90MHz    |  1.20(V)
     #  4  | 400MHz  |  100MHz   |  1.25(V)
-    set(OVERCLOCK_PROFILE 4)
+    set(OVERCLOCK_PROFILE 2)
 
     if(OVERCLOCK_PROFILE EQUAL 1)
         set(SYS_CLK_KHZ 266000)             # CPU clock speed
