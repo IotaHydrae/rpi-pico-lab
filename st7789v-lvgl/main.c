@@ -1,54 +1,63 @@
-/**
- * @file main.c
- * @author IotaHydrae (writeforever@foxmail.com)
- * @brief
- * @version 0.1
- * @date 2022-09-28
- *
- * MIT License
- *
- * Copyright 2022 IotaHydrae(writeforever@foxmail.com)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *
- */
+// Copyright (c) 2024 embeddedboys developers
+
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <stdio.h>
-#include <string.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
+#include "pico/time.h"
+#include "pico/stdio.h"
 #include "pico/stdlib.h"
+#include "pico/platform.h"
+#include "pico/stdio_uart.h"
 #include "pico/binary_info.h"
-#include "hardware/spi.h"
-#include "hardware/pwm.h"
 
-#include "include/st7789v.h"
+#include "hardware/pwm.h"
+#include "hardware/pll.h"
+#include "hardware/spi.h"
+#include "hardware/vreg.h"
+#include "hardware/clocks.h"
+#include "hardware/timer.h"
+
 #include "lvgl/lvgl.h"
 #include "lvgl/demos/lv_demos.h"
-
+#include "lvgl/examples/lv_examples.h"
 #include "port/lv_port_disp.h"
 
 #define TAG "st7789v: "
 
-#define pr_debug(fmt, ...) printf(TAG fmt, __VA_ARGS__)
+#define pr_debug(...) printf(TAG __VA_ARGS__)
 
 #define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 #define dm_gpio_set_value(p,v) gpio_put(p, v)
 #define mdelay(v) busy_wait_ms(v)
+
+#if ST7789V_SPIX == 0
+    #define spi_ifce spi0
+#elif ST7789V_SPIX == 1
+    #define spi_ifce spi1
+#else
+    #define spi_ifce spi_default
+#endif
 
 static void st7789v_reset()
 {
@@ -61,37 +70,22 @@ static void st7789v_reset()
     mdelay(10);
 }
 
-/* ========== st7789v I/O ========== */
-
-static inline void st7789v_write_byte(uint8_t val)
-{
-    uint8_t buf[1] = {val};
-    dm_gpio_set_value(ST7789V_CS_PIN, 0);
-    spi_write_blocking(spi_default, buf, 1);
-    dm_gpio_set_value(ST7789V_CS_PIN, 1);
-}
-
-void st7789v_write_command(uint8_t command)
-{
-    dm_gpio_set_value(ST7789V_DC_PIN, 0);
-    st7789v_write_byte(command);
-}
-
-void st7789v_write_data(uint8_t data)
-{
-    dm_gpio_set_value(ST7789V_DC_PIN, 1);
-    st7789v_write_byte(data);
-}
-
-void st7789v_write_buf_dc(void *buf, size_t len, bool dc)
+static void st7789v_spi_write_buf_dc(void *buf, size_t len, bool dc)
 {
     gpio_put(ST7789V_DC_PIN, dc);
 
     dm_gpio_set_value(ST7789V_CS_PIN, 0);
-    spi_write_blocking(spi_default, buf, len);
+    spi_write_blocking(spi_ifce, buf, len);
     dm_gpio_set_value(ST7789V_CS_PIN, 1);
 }
-#define write_buf_dc st7789v_write_buf_dc
+
+#if DISP_OVER_PIO
+extern int pio_spi_tx_init(uint data_pin, uint clk_pin);
+extern void pio_spi_tx_write_buf_dc(void *buf, size_t len, bool dc);
+#define write_buf_dc pio_spi_tx_write_buf_dc
+#else
+#define write_buf_dc st7789v_spi_write_buf_dc
+#endif
 
 static uint8_t reg_buf[64];
 static void st7789v_write_reg(int len, ...)
@@ -127,10 +121,7 @@ static void st7789v_init_display(void)
 {
     st7789v_reset();
 
-    sleep_ms(50);
-
     write_reg(0x11);
-
     sleep_ms(120);
 
     write_reg(0x36, 0x00);
@@ -173,7 +164,7 @@ static void st7789v_init_display(void)
     write_reg(0x29);
 }
 
-void st7789v_set_addr_win(int xs, int ys, int xe, int ye)
+static void st7789v_set_addr_win(int xs, int ys, int xe, int ye)
 {
     /* set column adddress */
     write_reg(0x2A, xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
@@ -185,30 +176,12 @@ void st7789v_set_addr_win(int xs, int ys, int xe, int ye)
     write_reg(0x2C);
 }
 
-// void on_pwm_wrap()
-// {
-//     static int fade = 0;
-//     static bool going_up = true;
-//     // Clear the interrupt flag that brought us here
-//     pwm_clear_irq(pwm_gpio_to_slice_num(ST7789V_BLK_PIN));
+void st7789v_video_flush(int xs, int ys, int xe, int ye, void *vmem16, size_t len)
+{
+    st7789v_set_addr_win(xs, ys, xe, ye);
+    write_buf_dc(vmem16, len, 1);
+}
 
-//     if (going_up) {
-//         ++fade;
-//         if (fade > 255) {
-//             fade = 255;
-//             going_up = false;
-//         }
-//     } else {
-//         --fade;
-//         if (fade < 0) {
-//             fade = 0;
-//             going_up = true;
-//         }
-//     }
-//     // Square the fade value to make the LED's brightness appear more linear
-//     // Note this range matches with the wrap value
-//     pwm_set_gpio_level(ST7789V_BLK_PIN, fade * fade);
-// }
 static void st7789v_set_backlight(uint16_t level)
 {
     pwm_set_gpio_level(ST7789V_BLK_PIN, level * level);
@@ -220,13 +193,34 @@ static void st7789v_set_backlight(uint16_t level)
  */
 static void hardware_init(void)
 {
-    stdio_init_all();
+    /* NOTE: DO NOT MODIFY THIS BLOCK */
+#define CPU_SPEED_MHZ (DEFAULT_SYS_CLK_KHZ / 1000)
+    if(CPU_SPEED_MHZ > 266 && CPU_SPEED_MHZ <= 396)
+        vreg_set_voltage(VREG_VOLTAGE_1_20);
+    else if (CPU_SPEED_MHZ > 396)
+        vreg_set_voltage(VREG_VOLTAGE_MAX);
+    else
+        vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
+
+    set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    CPU_SPEED_MHZ * MHZ,
+                    CPU_SPEED_MHZ * MHZ);
+    stdio_uart_init_full(uart0, 115200, 0, 1);
 
     /* Useing default SPI0 at 62500000 */
-    spi_init(spi_default, ST7789V_BUS_CLK_KHZ * 1000);
+#if DISP_OVER_PIO
+    pio_spi_tx_init(ST7789V_SDA_PIN, ST7789V_SCL_PIN);
+    bi_decl(bi_2pins_with_func(ST7789V_SCL_PIN, ST7789V_SDA_PIN, GPIO_FUNC_PIO0));
+#else
+    spi_init(spi_ifce, ST7789V_BUS_CLK_KHZ * 1000);
     gpio_set_function(ST7789V_SCL_PIN, GPIO_FUNC_SPI);
     gpio_set_function(ST7789V_SDA_PIN, GPIO_FUNC_SPI);
     bi_decl(bi_2pins_with_func(ST7789V_SCL_PIN, ST7789V_SDA_PIN, GPIO_FUNC_SPI));
+    pr_debug("spi%d initialized at %d kHz\n", spi_get_index(spi_ifce), spi_get_baudrate(spi_ifce) / 1000 );
+#endif
 
     gpio_init(ST7789V_CS_PIN);
     gpio_set_dir(ST7789V_CS_PIN, GPIO_OUT);
@@ -243,6 +237,7 @@ static void hardware_init(void)
 
     gpio_set_function(ST7789V_BLK_PIN, GPIO_FUNC_PWM);
     bi_decl(bi_1pin_with_name(ST7789V_BLK_PIN, "TFT BLK"));
+
     uint32_t slice_num = pwm_gpio_to_slice_num(ST7789V_BLK_PIN);
     // pwm_clear_irq(slice_num);
     // pwm_set_irq_enabled(slice_num, true);
@@ -272,7 +267,7 @@ int main(void)
     lv_init();
     lv_port_disp_init();
 
-    printf("Starting APP...\n");
+    pr_debug("Starting APP...\n");
     // lv_obj_t *btn = lv_btn_create(lv_scr_act());
     // lv_obj_set_style_bg_color(btn, lv_color_hex(0x1234), 0);
     // lv_obj_set_style_radius(btn, 10, 0);
@@ -289,6 +284,7 @@ int main(void)
     struct repeating_timer lvgl_timer;
     add_repeating_timer_ms(1, lvgl_timer_callback, NULL, &lvgl_timer);
 
+    pr_debug("going to loop...\n");
     for (;;) {
         tight_loop_contents();
         sleep_ms(200);

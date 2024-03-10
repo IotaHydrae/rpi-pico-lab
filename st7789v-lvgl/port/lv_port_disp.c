@@ -54,8 +54,9 @@ static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-extern void st7789v_write_buf_dc(void *buf, size_t len, bool dc);
-extern void st7789v_set_addr_win(int xs, int ys, int xe, int ye);
+// extern void st7789v_write_buf_dc(void *buf, size_t len, bool dc);
+// extern void st7789v_set_addr_win(int xs, int ys, int xe, int ye);
+extern void st7789v_video_flush(int xs, int ys, int xe, int ye, void *vmem16, size_t len);
 
 void lv_port_disp_init( void )
 {
@@ -170,8 +171,16 @@ static void disp_exit( void )
 static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
                         lv_color_t *color_p )
 {
-    st7789v_set_addr_win(area->x1, area->y1, area->x2, area->y2);
-    st7789v_write_buf_dc((void *)color_p, lv_area_get_size(area) * 2, 1);
+    // st7789v_set_addr_win(area->x1, area->y1, area->x2, area->y2);
+    // st7789v_write_buf_dc((void *)color_p, lv_area_get_size(area) * 2, 1);
+    st7789v_video_flush(
+        area->x1,
+        area->y1,
+        area->x2,
+        area->y2,
+        (void *)color_p,
+        lv_area_get_size(area) * 2
+    );
 
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
