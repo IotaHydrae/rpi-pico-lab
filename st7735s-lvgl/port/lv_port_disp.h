@@ -21,8 +21,8 @@ extern "C" {
 /*********************
  *      DEFINES
  *********************/
-#define MY_DISP_HOR_RES (160)
-#define MY_DISP_VER_RES (128)
+#define MY_DISP_HOR_RES (TFT_HOR_RES)
+#define MY_DISP_VER_RES (TFT_VER_RES)
 /* error handler */
 #define handle_error(msg) do {perror(msg);exit(-1);} \
     while(0)
