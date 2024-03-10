@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(OVERCLOCK_ENABLED 1)    # 1: enable, 0: disable
+set(OVERCLOCK_ENABLED 0)    # 1: enable, 0: disable
 
 if(OVERCLOCK_ENABLED)
     message(WARNING "Overclocking is enabled. This may damage your device. Use at your own risk.")
@@ -102,6 +102,8 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_RES_PIN=${ST7789V_RES_
 target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_DC_PIN=${ST7789V_DC_PIN})
 target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_CS_PIN=${ST7789V_CS_PIN})
 target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_BLK_PIN=${ST7789V_BLK_PIN})
+target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_HOR_RES=${ST7789V_HOR_RES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_VER_RES=${ST7789V_VER_RES})
 target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_SPIX=${ST7789V_SPIX})
 target_compile_definitions(${PROJECT_NAME} PUBLIC ST7789V_BUS_CLK_KHZ=${ST7789V_BUS_CLK_KHZ})
 target_compile_definitions(${PROJECT_NAME} PUBLIC DISP_OVER_PIO=${DISP_OVER_PIO})
