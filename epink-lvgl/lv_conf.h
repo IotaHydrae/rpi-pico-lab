@@ -24,7 +24,7 @@
  *====================*/
 
 /*Color depth: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)*/
-#define LV_COLOR_DEPTH 8
+#define LV_COLOR_DEPTH 1
 
 /*Swap the 2 bytes of RGB565 color. Useful if the display has an 8-bit interface (e.g. SPI)*/
 #define LV_COLOR_16_SWAP 0
@@ -85,10 +85,12 @@
 
 /*Use a custom tick source that tells the elapsed time in milliseconds.
  *It removes the need to manually update the tick with `lv_tick_inc()`)*/
-#define LV_TICK_CUSTOM 0
+#define LV_TICK_CUSTOM 1
 #if LV_TICK_CUSTOM
-    #define LV_TICK_CUSTOM_INCLUDE "Arduino.h"         /*Header for the system time function*/
-    #define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())    /*Expression evaluating to current system time in ms*/
+    // #define LV_TICK_CUSTOM_INCLUDE "Arduino.h"         /*Header for the system time function*/
+    // #define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())    /*Expression evaluating to current system time in ms*/
+    #define LV_TICK_CUSTOM_INCLUDE "pico/time.h"         /*Header for the system time function*/
+    #define LV_TICK_CUSTOM_SYS_TIME_EXPR (time_us_64() / 1000)    /*Expression evaluating to current system time in ms*/
 #endif   /*LV_TICK_CUSTOM*/
 
 /*Default Dot Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
@@ -669,7 +671,7 @@
  ====================*/
 
 /*Show some widget. It might be required to increase `LV_MEM_SIZE` */
-#define LV_USE_DEMO_WIDGETS        0
+#define LV_USE_DEMO_WIDGETS        1
 #if LV_USE_DEMO_WIDGETS
 #define LV_DEMO_WIDGETS_SLIDESHOW  0
 #endif
@@ -678,7 +680,7 @@
 #define LV_USE_DEMO_KEYPAD_AND_ENCODER     0
 
 /*Benchmark your system*/
-#define LV_USE_DEMO_BENCHMARK   0
+#define LV_USE_DEMO_BENCHMARK   1
 
 /*Stress test for LVGL*/
 #define LV_USE_DEMO_STRESS      1

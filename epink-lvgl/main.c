@@ -117,6 +117,8 @@ uint8_t epink_disp_buffer[EPINK_DISP_BUFFER_SIZE];
 extern unsigned char fontdata_mini_4x6[1536];
 extern unsigned char fontdata_8x16[4096];
 
+static void epink_putascii_string( uint8_t x, uint8_t y, char *str );
+
 /* ========== epink pin controls ========== */
 #ifdef EPINK_CS_PIN
 static inline void cs_select()
@@ -345,7 +347,6 @@ static void epink_device_init( uint8_t mode )
 static void epink_init( uint8_t mode )
 {
     epink_device_init( mode );
-    memset( epink_disp_buffer, 0xFF, ARRAY_SIZE( epink_disp_buffer ) );
 }
 
 /**
@@ -384,19 +385,7 @@ static void epink_sleep()
     epink_write_data( 0x01 );
 }
 
-/* ========== epink drawing functions ========== */
-static void __make_random_dram_data()
-{
-    for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
-        epink_disp_buffer[i] = 0x49;
-    }
-}
-
-/**
- * @brief Flush each byte in display buffer to screen
- * 
- */
-void epink_flush()
+void epink_flush(void)
 {
     uint8_t *pen = epink_disp_buffer;
     uint8_t width, height;
@@ -415,18 +404,47 @@ void epink_flush()
             epink_write_data( pen[j + i * 25] );
         }
     }
+
+    epink_turn_on_display();
+}
+
+void epink_video_flush(int xs, int ys, int xe, int ye, void *vmem, size_t len)
+{
+    uint8_t *pen = vmem;
+    uint8_t width, height;
+    width = ( EPINK_WIDTH % 8 == 0 ) ? ( EPINK_WIDTH / 8 ) :
+            ( EPINK_WIDTH / 8 + 1 );
+    height = EPINK_HEIGHT;
     
-    // sleep_ms(100);
+    epink_set_window( 0, 0, EPINK_WIDTH, EPINK_HEIGHT );
+    
+    for( uint8_t i = 0; i < height; i++ ) {
+        epink_set_cursor( 0, i );
+        epink_write_command( 0x24 );
+        
+        /* flush each line in buffer */
+        for( uint8_t j = 0; j < width; j++ ) {
+            epink_write_data( pen[j + i * 25] );
+        }
+    }
+
     epink_turn_on_display();
 }
 
 /**
  * @brief Simply clear the display buffer to 0xFF 
  */
-void epink_buffer_clear()
+static void epink_buffer_clear()
 {
     for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
         epink_disp_buffer[i] = 0xFF;
+    }
+}
+
+static void epink_load_buffer(const uint8_t *src)
+{
+    for( int i = 0; i < ARRAY_SIZE( epink_disp_buffer ); i++ ) {
+        epink_disp_buffer[i] = src[i];
     }
 }
 
@@ -587,10 +605,15 @@ static void hal_init(void)
 #endif
 }
 
+bool lvgl_timer_callback(struct repeating_timer *t)
+{
+    lv_timer_handler();
+    return true;
+}
+
+extern const unsigned char* epd_bitmap_allArray[];
 int main( void )
 {
-    stdio_init_all();
-
     hal_init();
 
     lv_init();
@@ -613,9 +636,9 @@ int main( void )
     epink_clear( 0xFF );
     sleep_ms(200);
     
-    // epink_putascii_string( 0, 0, TEST_DOC );
-    // epink_flush();
-    // sleep_ms( 500 );
+    epink_load_buffer(epd_bitmap_allArray[0]);
+    epink_flush();
+    sleep_ms( 1000 );
 
     // epink_clear( 0x00 );
     // sleep_ms(200);
@@ -623,14 +646,16 @@ int main( void )
     // sleep_ms(200);
 
     // lv_demo_widgets();
-    lv_demo_stress();
+    // lv_demo_stress();
+    lv_demo_benchmark();
 
-    while( 1 ) {
-        sleep_us(5000);
-        lv_timer_handler();
-        lv_tick_inc(5);
+    struct repeating_timer lvgl_timer;
+    add_repeating_timer_ms(5, lvgl_timer_callback, NULL, &lvgl_timer);
+
+    for (;;) {
+        tight_loop_contents();
+        sleep_ms(200);
     }
-    
-    return 0;
 
+    return 0;
 }

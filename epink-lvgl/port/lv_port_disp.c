@@ -32,16 +32,6 @@
 /**********************
  *      TYPEDEFS
  **********************/
-#if 0
-union rgb888 {
-    uint8_t data[0];
-    struct {
-        uint8_t r;
-        uint8_t g;
-        uint8_t b;
-    } channel;
-};
-#endif
 
 /**********************
  *  STATIC PROTOTYPES
@@ -50,15 +40,13 @@ static void disp_init( void );
 static void disp_exit( void );
 static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
                         lv_color_t *color_p );
-static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa);
+static void disp_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa);
 //static void gpu_fill(lv_disp_drv_t * disp_drv, lv_color_t * dest_buf, lv_coord_t dest_width,
 //        const lv_area_t * fill_area, lv_color_t color);
 
 /**********************
  *  STATIC VARIABLES
  **********************/
-extern uint8_t epink_disp_buffer[200*200/8];
-// int pixel_count=0;
 
 /**********************
  *      MACROS
@@ -67,9 +55,7 @@ extern uint8_t epink_disp_buffer[200*200/8];
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-extern void epink_buffer_clear();
-extern void epink_flush();
-extern void epink_draw_pixel( uint8_t x, uint8_t y, uint8_t color );
+extern void epink_video_flush(int xs, int ys, int xe, int ye, void *vmem, size_t len);
 
 void lv_port_disp_init( void )
 {
@@ -134,7 +120,7 @@ void lv_port_disp_init( void )
     disp_drv.ver_res = MY_DISP_VER_RES;
     
     /*Used to copy the buffer's content to the display*/
-    disp_drv.set_px_cb = my_set_pix_cb;
+    disp_drv.set_px_cb = disp_set_pix_cb;
     disp_drv.flush_cb = disp_flush;
     
     /*Set a display buffer*/
@@ -155,8 +141,8 @@ void lv_port_disp_init( void )
 
     // lv_disp_set_rotation(disp, LV_DISP_ROT_90);
     /* set a mono theme */
-    // lv_theme_t *th = lv_theme_mono_init(disp, 1, &lv_font_montserrat_10);
-    // lv_disp_set_theme(disp, th);
+    lv_theme_t *th = lv_theme_mono_init(disp, 1, &lv_font_montserrat_10);
+    lv_disp_set_theme(disp, th);
 }
 
 /**********************
@@ -166,9 +152,7 @@ void lv_port_disp_init( void )
 /*Initialize your display and the required peripherals.*/
 static void disp_init( void )
 {
-    /* malloc resources */
-    // g_dump_buffer = ( uint8_t * )malloc( MY_DISP_HOR_RES * MY_DISP_VER_RES * 4 );
-    // memset( g_dump_buffer, 0x0, MY_DISP_HOR_RES * MY_DISP_VER_RES * 4 );
+    /*You code here*/
 }
 
 static void disp_exit( void )
@@ -176,27 +160,13 @@ static void disp_exit( void )
     /*You code here*/
 }
 
-static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa)
+static void disp_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa)
 {
-    static uint8_t offset=0;
-    int page,page_left;
-    uint8_t *pen = epink_disp_buffer;
-    page = x / 8;
-    /* The page_left is the bit we need to set to page, will use later */
-    page_left = ( x % 8 == 0 ) ? 0 : x % 8;
-
-    // buf += buf_w/8 * y;
-    // buf += x/8;
-
     if(lv_color_brightness(color) < 128) {
-        pen[y * 25 + page] &= ~( 1 << ( 7 - page_left ) );
+        buf[y * 25 + (x / 8)] &= ~( 1 << ( 7 - (x % 8) ) );
+    } else {
+        buf[y * 25 + (x / 8)] |= ( 1 << ( 7 - (x % 8) ) );
     }
-    else {
-        pen[y * 25 + page] |= ( 1 << ( 7 - page_left ) );
-    }
-    
-    // printf("x:%d, y:%d\n", x, y);
-    // pixel_count++;
 }
 
 /*Flush the content of the internal buffer the specific area on the display
@@ -205,31 +175,15 @@ static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t bu
 static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
                         lv_color_t *color_p )
 {
-    /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
-    // int ret;
-    // int x, y;
+    epink_video_flush(
+        area->x1,
+        area->y1,
+        area->x2,
+        area->y2,
+        (void *)color_p,
+        lv_area_get_size(area) / 8
+    );
 
-    // for( y = area->y1; y < area->y2; y++ ) {
-    //     for( x = area->x1; x < area->x2; x++ ) {
-    //         epink_draw_pixel(x, y, color_p++->full);
-    //         pixel_count++;
-    //         // LV_LOG_WARN("pixel colorp val :%d", color_p->full);
-    //         // if(color_p->full)
-    //         //     printf("1");
-    //         // else
-    //         //     printf("0");
-    //     }
-    //     // printf("\n");
-    // }
-    // printf("\n");
-    // printf("\n");
-    // printf("\n");
-    // printf("\n");
-    // printf("pixel count:%d\n", pixel_count);
-    // pixel_count=0;
-
-    // memcpy(epink_disp_buffer, &color_p->full, 200*200/8);
-    epink_flush();
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
     lv_disp_flush_ready( disp_drv );
