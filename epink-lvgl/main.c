@@ -338,6 +338,24 @@ static void epink_device_init( uint8_t mode )
     }
 }
 
+static void epink_set_refresh_mode(uint8_t mode)
+{
+    /* set the look-up table register */
+    epink_write_command( 0x32 );
+    
+    if( mode == EPINK_UPDATE_MODE_FULL )
+        for( uint8_t i = 0; i < ARRAY_SIZE( EPD_1IN54_lut_full_update ); i++ ) {
+            epink_write_data( EPD_1IN54_lut_full_update[i] );
+        }
+    else if( mode == EPINK_UPDATE_MODE_PART )
+        for( uint8_t i = 0; i < ARRAY_SIZE( EPD_1IN54_lut_partial_update ); i++ ) {
+            epink_write_data( EPD_1IN54_lut_partial_update[i] );
+        }
+    else {
+        EPINK_DEBUG( "epink_init: unknown update mode\n" );
+    }
+}
+
 /**
  * @brief Real initialize function of epink, it
  * initialize the controller and display buffer
@@ -410,6 +428,7 @@ void epink_flush(void)
 
 void epink_video_flush(int xs, int ys, int xe, int ye, void *vmem, size_t len)
 {
+    static uint8_t refresh_count = 0;
     uint8_t *pen = vmem;
     uint8_t width, height;
     width = ( EPINK_WIDTH % 8 == 0 ) ? ( EPINK_WIDTH / 8 ) :
@@ -427,8 +446,15 @@ void epink_video_flush(int xs, int ys, int xe, int ye, void *vmem, size_t len)
             epink_write_data( pen[j + i * 25] );
         }
     }
+    refresh_count++;
 
-    epink_turn_on_display();
+    if (refresh_count  % 8 == 0) {
+        epink_set_refresh_mode( EPINK_UPDATE_MODE_FULL );
+        epink_turn_on_display();
+    } else {
+        epink_set_refresh_mode( EPINK_UPDATE_MODE_PART );
+        epink_turn_on_display();
+    }
 }
 
 /**
