@@ -621,33 +621,37 @@ int main( void )
 
     printf("%s\n", __func__);
 
-    epink_init( EPINK_UPDATE_MODE_FULL );
-
     /*  a global clear before drawing operations  */
+    epink_init( EPINK_UPDATE_MODE_FULL );
     epink_clear( 0x00 );
     sleep_ms(200);
     epink_clear( 0xFF );
     sleep_ms(200);
 
     epink_init( EPINK_UPDATE_MODE_PART );
-
     epink_clear( 0x00 );
     sleep_ms(200);
     epink_clear( 0xFF );
     sleep_ms(200);
     
-    epink_load_buffer(epd_bitmap_allArray[0]);
-    epink_flush();
-    sleep_ms( 1000 );
+    // epink_load_buffer(epd_bitmap_allArray[0]);
+    // epink_flush();
+    // sleep_ms( 1000 );
 
     // epink_clear( 0x00 );
     // sleep_ms(200);
     // epink_clear( 0xFF );
     // sleep_ms(200);
 
+    // lv_obj_t *btn = lv_btn_create(lv_scr_act());
+    // lv_obj_set_style_radius(btn, 5, 0);
+    // lv_obj_center(btn);
+    // lv_obj_t *lbl = lv_label_create(btn);
+    // lv_label_set_text(lbl, "embeddedboys.gitub.io/");
+
     // lv_demo_widgets();
-    // lv_demo_stress();
-    lv_demo_benchmark();
+    lv_demo_stress();
+    // lv_demo_benchmark();
 
     struct repeating_timer lvgl_timer;
     add_repeating_timer_ms(5, lvgl_timer_callback, NULL, &lvgl_timer);
