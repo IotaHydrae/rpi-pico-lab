@@ -142,7 +142,7 @@ void lv_port_disp_init( void )
     /*Finally register the driver*/
     lv_disp_t * disp = lv_disp_drv_register( &disp_drv );
     /* set a mono theme */
-    lv_theme_t *th = lv_theme_mono_init(disp, 1, &lv_font_montserrat_12);
+    lv_theme_t *th = lv_theme_mono_init(disp, 0, &lv_font_montserrat_12);
     lv_disp_set_theme(disp, th);
 }
 
@@ -164,7 +164,7 @@ static void disp_exit( void )
 static void disp_set_pix_cb(struct _lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y,
                       lv_color_t color, lv_opa_t opa)
 {
-    if(lv_color_brightness(color) > 128)
+    if(lv_color_brightness(color) < 128)
         buf[y * 25 + (x / 8)] &= ~( 1 << ( 7 - (x % 8) ) );
     else
         buf[y * 25 + (x / 8)] |= ( 1 << ( 7 - (x % 8) ) );

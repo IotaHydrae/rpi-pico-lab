@@ -292,7 +292,6 @@ int main(void)
 {
     hardware_init();
 
-    // for (;;);
     lv_init();
     lv_port_disp_init();
 
