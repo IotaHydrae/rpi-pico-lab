@@ -32,24 +32,19 @@
 
 static uint8_t ssd1306_buffer[SSD1306_BUFFER_SIZE];
 
-void ssd1306_write_cmd(uint8_t val)
+static void inline ssd1306_write_cmd(uint8_t val)
 {
-    uint8_t wbuf[2] = {0};
-    wbuf[0] = 0x00;
-    wbuf[1] = val;
-    i2c_write_blocking(i2c_default, 0x3c, wbuf, 2, false);
+    i2c_write_blocking(SSD1306_I2C_IF, SSD1306_ADDRESS, (uint8_t []){0x00, val}, 2, false);
 }
 
-void ssd1306_write_data(uint8_t val)
+static void inline ssd1306_write_data(uint8_t val)
 {
-    uint8_t wbuf[2] = {0};
-    wbuf[0] = 0x40;
-    wbuf[1] = val;
-    i2c_write_blocking(i2c_default, 0x3c, wbuf, 2, false);
+    i2c_write_blocking(SSD1306_I2C_IF, SSD1306_ADDRESS, (uint8_t []){0x40, val}, 2, false);
 }
-static void ssd1306_device_init()
+
+void ssd1306_init()
 {
-#ifdef SSD1306_128_32
+#if SSD1306_128_32
 	ssd1306_write_cmd(0xAE);//--display off
     // ssd1306_write_cmd(0x00);
     // ssd1306_write_cmd(0x10);
@@ -74,7 +69,6 @@ static void ssd1306_device_init()
 	ssd1306_write_cmd(0x49);	
 	ssd1306_write_cmd(0x8D);//set charge pump enable
 	ssd1306_write_cmd(0x14);
-    sleep_ms(200);
 	ssd1306_write_cmd(0xAF);//--turn on oled pan
 #else
 	ssd1306_write_cmd(0xAE); /*display off*/
@@ -83,7 +77,7 @@ static void ssd1306_device_init()
 	ssd1306_write_cmd(0x40); /*set display start line*/
 	ssd1306_write_cmd(0xB0); /*set page address*/
 	ssd1306_write_cmd(0x81); /*contract control*/
-	ssd1306_write_cmd(0x66); /*128*/
+	ssd1306_write_cmd(0xFF); /*128*/
 	ssd1306_write_cmd(0xA1); /*set segment remap*/
 	ssd1306_write_cmd(0xA6); /*normal / reverse*/
 	ssd1306_write_cmd(0xA8); /*multiplex ratio*/
@@ -103,6 +97,9 @@ static void ssd1306_device_init()
 	ssd1306_write_cmd(0x14);
 	ssd1306_write_cmd(0xAF); /*display ON*/
 #endif
+
+	ssd1306_write_cmd(0x20);
+	ssd1306_write_cmd(0x00);
 }
 
 
@@ -114,62 +111,19 @@ void ssd1306_set_pos(uint8_t page, uint8_t col)
 	ssd1306_write_cmd(0x10 | (col >> 4));
 }
 
-void ssd1306_init()
-{
-	int count = 0;
-	ssd1306_device_init();
-
-	for (; count < SSD1306_BUFFER_SIZE; count++)
-	{
-		ssd1306_buffer[count] = 0x00;
-	}    
-}
-
-void ssd1306_flush()
-{
-	uint8_t page, col;
-
-	for (page = 0; page < SSD1306_PAGE_SIZE; page++)
-		for (col = 0; col < SSD1306_HOR_RES_MAX; col++)
-		{
-			ssd1306_set_pos(page, col);
-			ssd1306_write_data(ssd1306_buffer[OFFSET(page, col)]);
-		}
-}
-
 void ssd1306_clear()
 {
-	uint8_t page, col;
+	ssd1306_set_pos(0, 0);
 
-	for (page = 0; page < SSD1306_PAGE_SIZE; page++)
-		for (col = 0; col < SSD1306_HOR_RES_MAX; col++)
-			if (ssd1306_buffer[OFFSET(page, col)] > 0x00)
-			{
-				ssd1306_set_pos(page, col);
-				ssd1306_write_data(0x00);
-			}
-	// memset(oled_buffer, 0x0, 1024);
-	// oled_flush();
+	for (size_t i = 0; i < SSD1306_BUFFER_SIZE; i++)
+		ssd1306_write_data(0x0);
 }
 
-void ssd1306_set_pixel(uint8_t x, uint8_t y, uint8_t color)
+void ssd1306_video_flush(int xs, int ys, int xe, int ye, void *vmem, size_t len)
 {
-	uint8_t page, page_left;
-	uint8_t *pen = ssd1306_buffer;
+	// printf("%s, xs : %d, ys : %d, xe : %d, ye : %d, len : %d\n", __func__, xs, ys, xe, ye, len);
+	ssd1306_set_pos(0, 0);
 
-#ifdef OLED_COORD_CHECK
-	if ((x >= 0 && x < SSD1306_HOR_RES_MAX) && (y >= 0 && y < SSD1306_VER_RES_MAX))
-	{
-#endif
-		page = y / 8;
-		page_left = y % 8 == 0 ? 0 : y % 8;
-
-		if (color)
-			pen[OFFSET(page, x)] |= (1 << page_left);
-		else
-			pen[OFFSET(page, x)] &= ~(1 << page_left);
-
-#ifdef OLED_COORD_CHECK
-	}
-#endif
+	for (size_t i = 0; i < len / 8; i++)
+		ssd1306_write_data(((uint8_t *)vmem)[i]);
 }

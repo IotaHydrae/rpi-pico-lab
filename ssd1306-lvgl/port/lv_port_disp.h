@@ -22,11 +22,8 @@ extern "C" {
 /*********************
  *      DEFINES
  *********************/
-#define MY_DISP_HOR_RES (SSD1306_HOR_RES_MAX)
-#define MY_DISP_VER_RES (SSD1306_VER_RES_MAX)
-/* error handler */
-#define handle_error(msg) do {perror(msg);exit(-1);} \
-    while(0)
+#define MY_DISP_HOR_RES (SSD1306_HOR_RES)
+#define MY_DISP_VER_RES (SSD1306_VER_RES)
 
 /**********************
  *      TYPEDEFS

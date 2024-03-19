@@ -39,17 +39,27 @@
 #define BIT(x) (1 << x)
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
+#define SSD1306_I2C_IF i2c1
+#define SSD1306_PIN_SCL 27
+#define SSD1306_PIN_SDA 26
+
 #define SSD1306_ADDRESS 0x3c
 
 #define SSD1306_CMD     0x00
 #define SSD1306_DATA    0x40
 
-#define SSD1306_HOR_RES_MAX 128
-#define SSD1306_VER_RES_MAX 64
-// #define SSD1306_128_32
-#define SSD1306_BUFFER_SIZE ((SSD1306_HOR_RES_MAX * SSD1306_VER_RES_MAX)/8)
-#define SSD1306_PAGE_SIZE (SSD1306_VER_RES_MAX/8)
-#define OLED_COLOR_DEPTH 1
+#define SSD1306_128_32  1
+
+#if SSD1306_128_32
+    #define SSD1306_HOR_RES 128
+    #define SSD1306_VER_RES 32
+#else
+    #define SSD1306_HOR_RES 128
+    #define SSD1306_VER_RES 64
+#endif
+
+#define SSD1306_BUFFER_SIZE ((SSD1306_HOR_RES * SSD1306_VER_RES)/8)
+#define SSD1306_PAGE_SIZE (SSD1306_VER_RES/8)
 
 #define OFFSET(p, c) ((p)*128 + (c))
 #define GET_PAGE_FROM_BUFFER(i) (i / 128)
@@ -76,8 +86,7 @@ enum {
  */
 
 void ssd1306_init();
-void ssd1306_write_data(uint8_t val);
-void ssd1306_set_pixel(uint8_t x, uint8_t y, uint8_t color);
-void ssd1306_flush();
+void ssd1306_clear();
+void ssd1306_video_flush(int xs, int ys, int xe, int ye, void *vmem, size_t len);
 
 #endif /* __SSD1306_H */

@@ -103,7 +103,9 @@ void lv_port_disp_init( void )
      *      This way LVGL will always provide the whole rendered screen in `flush_cb`
      *      and you only need to change the frame buffer's address.
      */
-    
+
+#define MY_DISP_BUF_SIZE (MY_DISP_HOR_RES * MY_DISP_VER_RES)
+
     /* Example for 1) */
     // static lv_disp_draw_buf_t draw_buf_dsc_1;
     // static lv_color_t buf_1[MY_DISP_HOR_RES * MY_DISP_VER_RES / 8];                          /*A buffer for 10 rows*/
@@ -117,9 +119,9 @@ void lv_port_disp_init( void )
     
     /* Example for 3) also set disp_drv.full_refresh = 1 below*/
     static lv_disp_draw_buf_t draw_buf_dsc_3;
-    static lv_color_t buf_3_1[MY_DISP_HOR_RES * MY_DISP_VER_RES];            /*A screen sized buffer*/
-    static lv_color_t buf_3_2[MY_DISP_HOR_RES * MY_DISP_VER_RES];            /*Another screen sized buffer*/
-    lv_disp_draw_buf_init( &draw_buf_dsc_3, buf_3_1, buf_3_2, MY_DISP_HOR_RES * MY_DISP_VER_RES );  /*Initialize the display buffer*/
+    static lv_color_t buf_3_1[MY_DISP_BUF_SIZE];            /*A screen sized buffer*/
+    static lv_color_t buf_3_2[MY_DISP_BUF_SIZE];            /*Another screen sized buffer*/
+    lv_disp_draw_buf_init( &draw_buf_dsc_3, buf_3_1, buf_3_2, MY_DISP_BUF_SIZE );  /*Initialize the display buffer*/
 
     /*-----------------------------------
      * Register the display in LVGL
@@ -145,8 +147,6 @@ void lv_port_disp_init( void )
     
     /*Required for Example 3)*/
     disp_drv.full_refresh = 1;
-
-    // disp_drv.sw_rotate = 1;
     
     /* Fill a memory array with a color if you have GPU.
      * Note that, in lv_conf.h you can enable GPUs that has built-in support in LVGL.
@@ -158,7 +158,7 @@ void lv_port_disp_init( void )
 
     // lv_disp_set_rotation(disp, LV_DISP_ROT_90);
     /* set a mono theme */
-    lv_theme_t *th = lv_theme_mono_init(disp, 1, &lv_font_montserrat_12);
+    lv_theme_t *th = lv_theme_mono_init(disp, true, lv_font_default());
     lv_disp_set_theme(disp, th);
 }
 
@@ -169,9 +169,9 @@ void lv_port_disp_init( void )
 /*Initialize your display and the required peripherals.*/
 static void disp_init( void )
 {
-    /* malloc resources */
-    // g_dump_buffer = ( uint8_t * )malloc( MY_DISP_HOR_RES * MY_DISP_VER_RES * 4 );
-    // memset( g_dump_buffer, 0x0, MY_DISP_HOR_RES * MY_DISP_VER_RES * 4 );
+    /*You code here*/
+    ssd1306_init();
+    ssd1306_clear();
 }
 
 static void disp_exit( void )
@@ -181,7 +181,10 @@ static void disp_exit( void )
 
 static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa)
 {
-    ssd1306_set_pixel(x, y, color.full);
+    if(color.full)
+        buf[(y / 8) * 128 + x] |= (1 << (y % 8));
+    else
+        buf[(y / 8) * 128 + x] &= ~(1 << (y % 8));
 }
 
 /*Flush the content of the internal buffer the specific area on the display
@@ -190,24 +193,14 @@ static void my_set_pix_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t bu
 static void disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area,
                         lv_color_t *color_p )
 {
-    /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
-    // int ret;
-    // int x, y;
-
-    // for( y = area->y1; y < area->y2; y++ ) {
-    //     for( x = area->x1; x < area->x2; x++ ) {
-    //         epink_draw_pixel(x, y, color_p++->full);
-    //         pixel_count++;
-    //         // LV_LOG_WARN("pixel colorp val :%d", color_p->full);
-    //         // if(color_p->full)
-    //         //     printf("1");
-    //         // else
-    //         //     printf("0");
-    //     }
-    //     // printf("\n");
-    // }
-
-    ssd1306_flush();
+    ssd1306_video_flush(
+        area->x1,
+        area->y1,
+        area->x2,
+        area->y2,
+        (void *)color_p,
+        lv_area_get_size(area)
+    );
 
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
