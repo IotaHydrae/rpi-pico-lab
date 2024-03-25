@@ -13,6 +13,7 @@
 #define USE_DMA 1
 
 #define I80_CLK_DIV 2.f
+#define I80_BUS_CLK_KHZ 60000
 
 #include "i80.pio.h"
 
@@ -93,7 +94,8 @@ int i80_pio_init(void)
     channel_config_set_dreq(&c, pio_get_dreq(g_pio, g_sm, true));
 
     uint offset = pio_add_program(g_pio, &i80_program);
-    i80_program_init(g_pio, g_sm, offset, 0, 16, 19, I80_CLK_DIV);
+    float clk_div = (DEFAULT_PIO_CLK_KHZ / 2.f / I80_BUS_CLK_KHZ);
+    i80_program_init(g_pio, g_sm, offset, 0, 16, 19, clk_div);
 
     return 0;
 }
