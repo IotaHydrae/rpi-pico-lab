@@ -1,4 +1,6 @@
 #include "pico/stdlib.h"
+#include "hardware/vreg.h"
+#include "hardware/clocks.h"
 
 #define HC595_PIN_DS  2
 #define HC595_PIN_RCK 3
@@ -23,12 +25,14 @@ void hc595_out8(uint8_t val)
     gpio_put(HC595_PIN_SCK, 0);
     gpio_put(HC595_PIN_RCK, 0);
     for (int i = 0; i < 8; i++) {
-        gpio_put(HC595_PIN_DS, val & 0x1);
-        gpio_put(HC595_PIN_SCK, 1);
-        val >>= 1;
         gpio_put(HC595_PIN_SCK, 0);
+        gpio_put(HC595_PIN_DS, val & 0x80);
+        gpio_put(HC595_PIN_SCK, 1);
+        val <<= 1;
     }
+    
     gpio_put(HC595_PIN_RCK, 1);
+    gpio_put(HC595_PIN_SCK, 0);
 }
 
 void hc595_out16(uint16_t val)
@@ -47,13 +51,29 @@ void hc595_out16(uint16_t val)
 
     gpio_put(HC595_PIN_RCK, 1);
     gpio_put(HC595_PIN_SCK, 0);
-    gpio_put(HC595_PIN_RCK, 0);
 }
 
 int main()
 {
-    set_sys_clock_48mhz();
+    /* NOTE: DO NOT MODIFY THIS BLOCK */
+#define CPU_SPEED_MHZ (DEFAULT_SYS_CLK_KHZ / 1000)
+    if(CPU_SPEED_MHZ > 266 && CPU_SPEED_MHZ <= 360)
+        vreg_set_voltage(VREG_VOLTAGE_1_20);
+    else if (CPU_SPEED_MHZ > 360 && CPU_SPEED_MHZ <= 396)
+        vreg_set_voltage(VREG_VOLTAGE_1_25);
+    else if (CPU_SPEED_MHZ > 396)
+        vreg_set_voltage(VREG_VOLTAGE_MAX);
+    else
+        vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
 
+    set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    CPU_SPEED_MHZ * MHZ,
+                    CPU_SPEED_MHZ * MHZ);
+
+    // set_sys_clock_48mhz();
     gpio_init(HC595_PIN_DS);
     gpio_init(HC595_PIN_RCK);
     gpio_init(HC595_PIN_SCK);

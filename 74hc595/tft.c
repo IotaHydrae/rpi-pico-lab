@@ -218,29 +218,6 @@ static void tft_clear(uint16_t color)
             write_data(color);
 }
 
-void tft_test_init(void)
-{
-    gpio_init(TFT_PIN_CS);
-    gpio_init(TFT_PIN_WR);
-    gpio_init(TFT_PIN_DC);
-    gpio_init(TFT_PIN_RD);
-    gpio_init(TFT_PIN_RST);
-    gpio_init(TFT_PIN_BLK);
-
-    gpio_set_dir(TFT_PIN_CS, GPIO_OUT);
-    gpio_set_dir(TFT_PIN_WR, GPIO_OUT);
-    gpio_set_dir(TFT_PIN_DC, GPIO_OUT);
-    gpio_set_dir(TFT_PIN_RD, GPIO_OUT);
-    gpio_set_dir(TFT_PIN_RST, GPIO_OUT);
-    gpio_set_dir(TFT_PIN_BLK, GPIO_OUT);
-
-    gpio_put(TFT_PIN_BLK, 1);
-
-    tft_reset();
-    gpio_put(TFT_PIN_RD, 1);
-    busy_wait_ms(120);
-}
-
 void tft_init(void)
 {
     gpio_init(TFT_PIN_CS);
@@ -266,12 +243,7 @@ void tft_init(void)
 
     tft_init_display();
     gpio_put(TFT_PIN_BLK, 1);
-    for (;;);
-    
-    for (;;) {
-        tft_clear(0x1234);
+    for (int color = 0; color < 0xffff; color += 128) {
+        tft_clear(color);
     }
-    // for (int color = 0; color < 0xffff; color += 128) {
-    //     tft_clear(color);
-    // }
 }
