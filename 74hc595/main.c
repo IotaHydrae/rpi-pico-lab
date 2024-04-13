@@ -1,12 +1,17 @@
+#include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
 
-#define HC595_PIN_DS  2
-#define HC595_PIN_RCK 3
-#define HC595_PIN_SCK 4
+// #define HC595_PIN_DS  2
+// #define HC595_PIN_RCK 3
+// #define HC595_PIN_SCK 4
 
-#define HC595_COUNT 2
+#define HC595_PIN_SCK 6
+#define HC595_PIN_DS  7
+#define HC595_PIN_RCK 9
+
+#define HC595_COUNT 1
 
 extern void tft_init(void);
 extern void tft_test_init(void);
@@ -22,15 +27,18 @@ static void gpiod_set_value(int pin, bool val)
 
 void hc595_out8(uint8_t val)
 {
-    gpio_put(HC595_PIN_SCK, 0);
+    int i;
+    // val = (val << 8) | (val >> 8);
+    
     gpio_put(HC595_PIN_RCK, 0);
-    for (int i = 0; i < 8; i++) {
+    
+    for (i = 0; i < 8; i++) {
         gpio_put(HC595_PIN_SCK, 0);
         gpio_put(HC595_PIN_DS, val & 0x80);
         gpio_put(HC595_PIN_SCK, 1);
         val <<= 1;
     }
-    
+
     gpio_put(HC595_PIN_RCK, 1);
     gpio_put(HC595_PIN_SCK, 0);
 }
@@ -72,6 +80,9 @@ int main()
                     CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
                     CPU_SPEED_MHZ * MHZ,
                     CPU_SPEED_MHZ * MHZ);
+    stdio_uart_init_full(uart0, 115200, 16, 17);
+
+    printf("\n\n74hc595 tft testing...\n");
 
     // set_sys_clock_48mhz();
     gpio_init(HC595_PIN_DS);

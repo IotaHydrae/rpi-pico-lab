@@ -49,7 +49,7 @@ project(blink)
 pico_sdk_init()
 
 # rest of your project
-add_executable(blink main.c tft.c)
+add_executable(blink main.c tft_r61581.c)
 
 target_link_libraries(blink pico_stdlib)
 
