@@ -51,8 +51,11 @@ SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -Wl,--print-me
 SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--print-memory-usage")
 
 include_directories(PUBLIC .)
-# add_subdirectory(lvgl)
-# add_subdirectory(pio)
+add_subdirectory(lvgl)
+target_link_libraries(lvgl pico_stdlib)
+
+add_subdirectory(pio)
+target_compile_definitions(pio_i80 PUBLIC DEFAULT_PIO_CLK_KHZ=${PERI_CLK_KHZ})
 
 file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
                             "lvgl/demos/widgets/*.c"
@@ -61,12 +64,14 @@ file(GLOB_RECURSE SOURCES "lvgl/src/*.c"
                             "lvgl/demos/music/*.c"
                             "lvgl/demos/keypad_encoder/*.c")
 
+set(DISP_OVER_PIO 1)
+
 # rest of your project
 if (DISP_OVER_PIO)
     add_executable(lg4572b_gpio main.c lg4572b_pio.c
         porting/lv_port_disp_template.c pio/i80.c ${SOURCES})
     pico_generate_pio_header(lg4572b_gpio ${CMAKE_CURRENT_LIST_DIR}/pio/i80.pio)
-    target_link_libraries(lg4572b_gpio pico_stdlib hardware_pwm hardware_pio hardware_dma)
+    target_link_libraries(lg4572b_gpio pico_stdlib hardware_pwm hardware_pio hardware_dma pio_i80)
 else(DISP_OVER_PIO)
     add_executable(lg4572b_gpio main.c lg4572b_gpio.c porting/lv_port_disp_template.c)
     target_link_libraries(lg4572b_gpio lvgl lvgl_demos pico_stdlib hardware_pwm)

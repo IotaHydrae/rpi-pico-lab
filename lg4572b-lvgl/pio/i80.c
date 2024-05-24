@@ -13,7 +13,7 @@
 #define USE_DMA 1
 
 #define I80_CLK_DIV 2.f
-#define I80_BUS_CLK_KHZ 60000
+#define I80_BUS_CLK_KHZ 50000
 
 #include "i80.pio.h"
 
