@@ -19,6 +19,8 @@
 
 #include "usb_common.h"
 
+// #define printf(...)
+
 #define EP0_IN_ADDR  (USB_DIR_IN  | 0)
 #define EP0_OUT_ADDR (USB_DIR_OUT | 0)
 #define EP1_OUT_ADDR (USB_DIR_OUT | 1)
@@ -75,7 +77,7 @@ static const struct usb_device_descriptor device_descriptor = {
     .bDeviceClass       = 0,        // Specified in interface descriptor
     .bDeviceSubClass    = 0,        // No subclass
     .bDeviceProtocol    = 0,        // No protocol
-    .bMaxPacketSize0    = 0,        // Max packet size for endpoint 0
+    .bMaxPacketSize0    = 64,        // Max packet size for endpoint 0
     .idVendor           = 0x2e8a,
     .idProduct          = 0x0049,
     .bcdDevice          = 0,        // No device revision number
@@ -201,28 +203,6 @@ static struct usb_device_configuration dev_config = {
     }
 };
 
-void ep0_in_handler(__unused uint8_t *buf, __unused uint16_t len) {
-    // if (should_set_address) {
-    //     usb_hw->dev_addr_ctrl = dev_addr;
-    //     should_set_address = false;
-    // } else {
-    //     struct usb_end
-    // }
-    printf("%s\n", __func__);
-}
-
-void ep0_out_handler(__unused uint8_t *buf, __unused uint16_t len) {
-    printf("%s\n", __func__);
-}
-
-void ep1_out_handler(uint8_t *buf, uint16_t len) {
-    printf("%s\n", __func__);
-}
-
-void ep2_in_handler(uint8_t *buf, uint16_t len) {
-    printf("%s\n", __func__);
-}
-
 struct usb_endpoint_configuration *usb_get_endpoint_configuration(uint8_t addr)
 {
     struct usb_endpoint_configuration *endpoints = dev_config.endpoints;
@@ -266,8 +246,7 @@ void usb_setup_endpoints() {
 
 void usb_device_init()
 {
-    reset_block(RESETS_RESET_USBCTRL_BITS);
-    unreset_block_wait(RESETS_RESET_USBCTRL_BITS);
+    reset_unreset_block_num_wait_blocking(RESETS_RESET_USBCTRL_BITS);
 
     memset(usb_dpram, 0, sizeof(*usb_dpram));
 
@@ -290,19 +269,6 @@ void usb_device_init()
     usb_hw_set->sie_ctrl = USB_SIE_CTRL_PULLUP_EN_BITS;
 }
 
-int main()
-{
-    stdio_uart_init_full(uart0, 115200, 16, 17);
-    printf("\n\n\n\nUSB Device Low-Level hardware example\n");
-
-    usb_device_init();
-
-    for (;;) {
-        tight_loop_contents();
-    }
-    return 0;
-}
-
 static inline bool ep_is_tx(struct usb_endpoint_configuration *ep)
 {
     return ep->descriptor->bEndpointAddress & USB_DIR_IN;
@@ -312,12 +278,14 @@ void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uin
 {
     assert(len <= 64);
 
-    printf("Start transfer of len %d on ep addr 0x%0x\n", len, ep->descriptor->bEndpointAddress);
+    printf("%s, len %d on ep addr 0x%0x\n", __func__, len, ep->descriptor->bEndpointAddress);
 
     uint32_t val = len | USB_BUF_CTRL_AVAIL;
 
     if (ep_is_tx(ep)) {
+        // need to copy the data from the user buffer to the usb memory
         memcpy((void *) ep->data_buffer, (void *) buf, len);
+        // Mark as full
         val |= USB_BUF_CTRL_FULL;
     }
 
@@ -326,6 +294,51 @@ void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uin
     ep->next_pid ^= 1u;
 
     *ep->buffer_control = val;
+}
+
+int main()
+{
+    stdio_uart_init_full(uart0, 115200, 16, 17);
+    printf("\n\n\n\nUSB Device Low-Level hardware example\n");
+
+    usb_device_init();
+
+    while(!configured) {
+        tight_loop_contents();
+    }
+
+    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
+
+    for (;;) {
+        tight_loop_contents();
+    }
+    return 0;
+}
+
+void ep0_in_handler(uint8_t *buf, uint16_t len) {
+    printf("%s\n", __func__);
+    if (should_set_address) {
+        usb_hw->dev_addr_ctrl = dev_addr;
+        should_set_address = false;
+    } else {
+        struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_OUT_ADDR);
+        usb_start_transfer(ep, NULL, 0);
+    }
+}
+
+void ep0_out_handler(__unused uint8_t *buf, __unused uint16_t len) {
+    printf("%s\n", __func__);
+}
+
+void ep1_out_handler(uint8_t *buf, uint16_t len) {
+    printf("%s\n", __func__);
+    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP2_IN_ADDR);
+    usb_start_transfer(ep, buf, len);
+}
+
+void ep2_in_handler(uint8_t *buf, uint16_t len) {
+    printf("%s\n", __func__);
+    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
 }
 
 void usb_handle_device_descriptor(volatile struct usb_setup_packet *pkt)
@@ -337,29 +350,90 @@ void usb_handle_device_descriptor(volatile struct usb_setup_packet *pkt)
     usb_start_transfer(ep, (uint8_t *)d, MIN(sizeof(struct usb_device_descriptor), pkt->wLength));
 }
 
+void usb_acknowledge_out_request(void)
+{
+    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
+}
+
+void usb_set_device_address(volatile struct usb_setup_packet *pkt)
+{
+    dev_addr = (pkt->wValue & 0xff);
+    printf("Set address %d\n", dev_addr);
+
+    should_set_address = true;
+    usb_acknowledge_out_request();
+}
+
+void usb_bus_reset(void)
+{
+    dev_addr = 0;
+    should_set_address = false;
+    usb_hw->dev_addr_ctrl = 0;
+    configured = false;
+}
+
+static void usb_handle_ep_buff_done(struct usb_endpoint_configuration *ep)
+{
+    uint32_t buffer_control = *ep->buffer_control;
+    uint16_t len = buffer_control & USB_BUF_CTRL_LEN_MASK;
+
+    ep->handler((uint8_t *) ep->data_buffer, len);
+}
+
+static void usb_handle_buff_done(uint ep_num, bool in)
+{
+    uint8_t ep_addr = ep_num | (in ? USB_DIR_IN : 0);
+    printf("%s, EP %d (in = %d) done\n", __func__, ep_num, in);
+    for (uint i = 0; i < USB_NUM_ENDPOINTS; i++) {
+        struct usb_endpoint_configuration *ep = &dev_config.endpoints[i];
+        if (ep->descriptor && ep->handler) {
+            if (ep->descriptor->bEndpointAddress == ep_addr) {
+                usb_handle_ep_buff_done(ep);
+                return;
+            }
+        }
+    }
+}
+
+static void usb_handle_buff_status()
+{
+    uint32_t buffers = usb_hw->buf_status;
+    uint32_t remaining_buffers = buffers;
+
+    uint bit = 1u;
+    for (uint i = 0; remaining_buffers && i < USB_NUM_ENDPOINTS * 2; i++) {
+        if (remaining_buffers & bit) {
+            usb_hw_clear->buf_status = bit;
+            usb_handle_buff_done(i >> 1u, !(i & 1u));
+            remaining_buffers &= ~bit;
+        }
+        bit <<= 1u;
+    }
+}
+
 void usb_handle_setup_packet(void)
 {
     volatile struct usb_setup_packet *pkt = (volatile struct usb_setup_packet *) &usb_dpram->setup_packet;
     uint8_t req_direction = pkt->bmRequestType;
     uint8_t req = pkt->bRequest;
 
-    printf("bmRequestType: 0x%0x, bRequest: 0x%0x\n", req_direction, req);
+    // printf("bmRequestType: 0x%0x, bRequest: 0x%0x\n", req_direction, req);
     usb_get_endpoint_configuration(EP0_IN_ADDR)->next_pid = 1u;
 
     if (req_direction == USB_DIR_OUT) {
         if (req == USB_REQUEST_SET_ADDRESS) {
+            usb_set_device_address(pkt);
             printf("OUT: Set address request\n");
         } else if (req == USB_REQUEST_GET_CONFIGURATION) {
             printf("OUT: Get configuration request\n");
         } else {
+            usb_acknowledge_out_request();
             printf("Other OUT request (0x%0x)\r\n", pkt->bRequest);
         }
 
     } else if (req_direction == USB_DIR_IN) {
-        printf("USB_DIR_IN\n");
         if (req == USB_REQUEST_GET_DESCRIPTOR) {
             uint16_t descriptor_type = pkt->wValue >> 8;
-            printf("IN: Get descriptor request\n");
 
             switch (descriptor_type) {
             case USB_DT_DEVICE:
@@ -382,6 +456,9 @@ void usb_handle_setup_packet(void)
     }
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 void isr_usbctrl(void)
 {
     uint32_t status = usb_hw->ints;
@@ -389,7 +466,7 @@ void isr_usbctrl(void)
 
     // Setup packet received
     if (status & USB_INTS_SETUP_REQ_BITS) {
-        printf("Setup packet received\n");
+        printf("%s, setup packet received\n", __func__);
         handled |= USB_INTS_SETUP_REQ_BITS;
         usb_hw_clear->sie_status = USB_SIE_STATUS_SETUP_REC_BITS;
         usb_handle_setup_packet();
@@ -397,6 +474,22 @@ void isr_usbctrl(void)
 
     // Buffer status, one or more buffers have completed
     if (status & USB_INTS_BUFF_STATUS_BITS) {
+        printf("%s, one or more buffer \n", __func__);
         handled |= USB_INTS_BUFF_STATUS_BITS;
+        usb_handle_buff_status();
+    }
+
+    if (status & USB_INTS_BUS_RESET_BITS) {
+        // printf("%s, bus reset\n", __func__);
+        handled |= USB_INTS_BUS_RESET_BITS;
+        usb_hw_clear->sie_ctrl = USB_SIE_STATUS_BUS_RESET_BITS;
+        usb_bus_reset();
+    }
+
+    if (status ^ handled) {
+        panic("Unhandled IRQ 0x%x\n", (uint) (status ^ handled));
     }
 }
+#ifdef __cplusplus
+}
+#endif

@@ -17,6 +17,14 @@ pico_sdk_init()
 # rest of your project
 add_executable(blink main.c)
 
+add_compile_options(-Wall
+        -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
+        -Wno-unused-function # we have some for the docs that aren't called
+        )
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-maybe-uninitialized)
+endif()
+
 target_link_libraries(blink PRIVATE pico_stdlib hardware_resets hardware_irq)
 
 pico_add_extra_outputs(blink)
