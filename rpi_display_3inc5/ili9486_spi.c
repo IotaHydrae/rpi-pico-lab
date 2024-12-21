@@ -9,7 +9,6 @@
  * problem is the lag of refresh
  */
 
-#include "pico/platform.h"
 #include "pico/time.h"
 #define pr_fmt(fmt) "ili9486: " fmt
 
@@ -61,15 +60,14 @@ struct ili9486_priv {
     u8                      *buf;
 
     struct {
+        int scl;
+        int sda;
         int reset;
-        int cs;   /* chip select */
-        int rs;   /* register/data select */
-        int wr;   /* write signal */
-        int rd;   /* read signal */
-        int bl;   /* backlight */
-        int db[16];
+        int dc;
+        int cs;
+        int blk;
     } gpio;
-    
+
     /* device specific */
     const struct ili9486_operations  *tftops;
     struct ili9486_display           *display;
@@ -98,16 +96,16 @@ static int ili9486_write_reg(struct ili9486_priv *priv, int len, ...)
     u8 *buf = (u8 *)priv->buf;
     va_list args;
     int i;
-    
+
     va_start(args, len);
     *buf = (u8)va_arg(args, unsigned int);
     write_buf_rs(priv, buf, sizeof(u8), 0);
     len--;
-    
+
     /* if there no privams */
     if (len == 0)
         return 0;
-    
+
     for (i = 0; i < len; i++) {
         *buf = (u8)va_arg(args, unsigned int);
         buf++;
@@ -115,7 +113,7 @@ static int ili9486_write_reg(struct ili9486_priv *priv, int len, ...)
 
     write_buf_rs(priv, priv->buf, len, 1);
     va_end(args);
-    
+
     return 0;
 }
 #define NUMARGS(...)  (sizeof((int[]){__VA_ARGS__}) / sizeof(int))
@@ -169,12 +167,12 @@ static int ili9486_set_addr_win(struct ili9486_priv *priv, int xs, int ys, int x
     write_reg(priv, 0x2a,
         (xs >> 8) & 0xff, xs & 0xff,
         (xe >> 8) & 0xff, xe & 0xff);
-    
+
     /* set row address */
     write_reg(priv, 0x2b,
         (ys >> 8) & 0xff, ys & 0xff,
         (ye >> 8) & 0xff, ye & 0xff);
-    
+
     /* write start */
     write_reg(priv, 0x2c);
     return 0;
@@ -184,26 +182,16 @@ static int ili9486_clear(struct ili9486_priv *priv, u16 clear)
 {
     u32 width = priv->display->xres;
     u32 height = priv->display->yres;
-    // u8 color_h, color_l;
-    int x, y;
-
+    int i;
 
     pr_debug("clearing screen (%d x %d) with color 0x%x\n", width, height, clear);
 
     priv->tftops->set_addr_win(priv, 0, 0,
                          priv->display->xres - 1,
                          priv->display->yres - 1);
-    
-    // color_h = clear >> 8;
-    // color_l = clear & 0xff;
 
-    for (x = 0; x < width; x++) {
-        for (y = 0; y < height; y++) {
-            // write_buf_rs(priv, &color_h, sizeof(u8), 1);
-            // write_buf_rs(priv, &color_l, sizeof(u8), 1);
-            write_buf_rs(priv, &clear, sizeof(u16), 1);
-        }
-    }
+    for (i = 0; i < width * height; i++)
+            pio_spi_write_buf16_rs(&clear, sizeof(u16), 1);
 
     return 0;
 }
@@ -237,20 +225,24 @@ static int ili9486_gpio_init(struct ili9486_priv *priv)
 
     gpio_init(priv->gpio.reset);
     gpio_init(priv->gpio.cs);
-    gpio_init(priv->gpio.rs);
+    gpio_init(priv->gpio.dc);
 
     gpio_set_dir(priv->gpio.reset, GPIO_OUT);
     gpio_set_dir(priv->gpio.cs, GPIO_OUT);
-    gpio_set_dir(priv->gpio.rs, GPIO_OUT);
+    gpio_set_dir(priv->gpio.dc, GPIO_OUT);
 
     return 0;
 }
+
+extern int pio_spi_tx_init(int data_pin, int clock_pin);
 
 static int ili9486_hw_init(struct ili9486_priv *priv)
 {
     int ret;
 
     printf("initializing hardware...\n");
+
+    pio_spi_tx_init(priv->gpio.sda, priv->gpio.scl);
 
     ili9486_gpio_init(priv);
 
@@ -290,47 +282,32 @@ int ili9486_video_flush(int xs, int ys, int xe, int ye, void *data, size_t len)
 static int ili9486_probe(struct ili9486_priv *priv)
 {
     pr_debug("ili9486 probing ...\n");
-    
+
     priv->buf = (u8 *)malloc(PAGE_SIZE);
-    
+
     priv->display = &default_ili9486_display;
     priv->tftops = &default_ili9486_ops;
 
-    priv->gpio.reset = 15;
-    priv->gpio.rs    = 27;
-    priv->gpio.cs    = 17;
-
-    for (int i = 0; i < ARRAY_SIZE(priv->gpio.db); i++)
-        priv->gpio.db[i] = i;
+    priv->gpio.reset = 25;
+    priv->gpio.dc    = 24;
+    priv->gpio.cs    = 8;
+    priv->gpio.sda   = 11;
+    priv->gpio.scl   = 10;
 
     ili9486_hw_init(priv);
-    
+
     return 0;
 }
 
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
 
-#define PICO_FLASH_SPI_CLKDIV 2
-#define CPU_SPEED_MHZ 280
-
-extern int pio_spi_tx_init(void);
-
 #if 1
 int main()
 {
-    vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
-    set_sys_clock_khz(CPU_SPEED_MHZ * 1000, true);
-    clock_configure(clk_peri,
-                    0,
-                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
-                    CPU_SPEED_MHZ * MHZ,
-                    CPU_SPEED_MHZ * MHZ);
-    stdio_uart_init_full(uart0, 115200, 16, 17);
+    stdio_uart_init_full(uart1, 115200, 4, 5);
 
     pr_debug("\n\n\n\nThis is a simple test driver for ili9486\n");
-
-    pio_spi_tx_init();
 
     ili9486_probe(&g_priv);
 
