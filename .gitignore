@@ -2,6 +2,7 @@
 .vscode/
 .cache/
 build/
+build-pico2/
 
 # Prerequisites
 *.d
