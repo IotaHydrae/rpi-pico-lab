@@ -50,7 +50,7 @@ if(OVERCLOCK_ENABLED)
     elseif(${PICO_BOARD} STREQUAL "pico2" OR ${PICO_PLATFORM} STREQUAL "rp2350")
         # Overclocking profiles
         #      SYS_CLK  | FLASH_CLK | Voltage
-        #  1  | 366MHz  |  183MHz   |  1.20(V)
+        #  1  | 366MHz  |  122MHz   |  1.20(V)
         #  2  | 225000  |  75MHz    |  1.20(V)
         set(OVERCLOCK_PROFILE 2)
 
