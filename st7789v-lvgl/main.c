@@ -208,7 +208,7 @@ static void hardware_init(void)
                     CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
                     CPU_SPEED_MHZ * MHZ,
                     CPU_SPEED_MHZ * MHZ);
-    stdio_uart_init_full(uart0, 115200, 0, 1);
+    // stdio_uart_init_full(uart0, 115200, 0, 1);
 
     /* Useing default SPI0 at 62500000 */
 #if DISP_OVER_PIO
@@ -254,11 +254,11 @@ static void hardware_init(void)
     tft_set_backlight(128);
 }
 
-bool lvgl_timer_callback(struct repeating_timer *t)
-{
-    lv_timer_handler();
-    return true;
-}
+// bool lvgl_timer_callback(struct repeating_timer *t)
+// {
+//     lv_timer_handler();
+//     return true;
+// }
 
 int main(void)
 {
@@ -281,12 +281,13 @@ int main(void)
     // lv_demo_music();
     lv_demo_benchmark();
 
-    struct repeating_timer lvgl_timer;
-    add_repeating_timer_ms(1, lvgl_timer_callback, NULL, &lvgl_timer);
+    // struct repeating_timer lvgl_timer;
+    // add_repeating_timer_ms(1, lvgl_timer_callback, NULL, &lvgl_timer);
 
     pr_debug("going to loop...\n");
     for (;;) {
-        tight_loop_contents();
-        sleep_ms(200);
+        // tight_loop_contents();
+        // sleep_ms(200);
+        lv_timer_handler_run_in_period(1);
     }
 }
