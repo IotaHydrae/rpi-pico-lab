@@ -64,6 +64,8 @@
     #error "Invalid ST7305 panel selected"
 #endif
 
+static unsigned char st7305_buffer[(204 * 2 / 8) * 100];
+
 /* ========== st7305 pin controls ========== */
 #ifdef PICO_DEFAULT_SPI_CSN_PIN
 static inline void cs_select()
@@ -142,6 +144,7 @@ static void st7305_write_data( uint8_t data )
 {
     st7305_dc_set();
     st7305_write_byte( data );
+    // busy_wait_us(1500);
 }
 #define write_data st7305_write_data
 
@@ -190,12 +193,16 @@ static void st7305_device_init(void)
 	write_data(0X27); //VSLN4
 
 	write_cmd(0xD8); //HPM=32Hz
-	write_data(0XA6); //~51Hz
+	write_data(0XA6); //~32Hz
 	write_data(0XE9); //~1Hz
 
-/*-- HPM=32hz ; LPM=> 0x15=8Hz 0x14=4Hz 0x13=2Hz 0x12=1Hz 0x11=0.5Hz 0x10=0.25Hz---*/
+	// write_cmd(0xD8); //HPM=51Hz
+	// write_data(0X80); //~51Hz
+	// write_data(0XE9); //~1Hz
+
+    /* See manual page 76 FRCTRL(B2h) for more info */
 	write_cmd(0xB2); //Frame Rate Control
-	write_data(0X12); //HPM=32hz ; LPM=1hz
+	write_data(0X02); //HPM=16hz ; LPM=1hz
 
 	write_cmd(0xB3); //Update Period Gate EQ Control in HPM
 	write_data(0XE5);
@@ -267,7 +274,8 @@ static void st7305_device_init(void)
 	write_cmd(0xD0); //Auto power dowb
 	write_data(0XFF); //
 
-	write_cmd(0x39); //LPM
+    write_cmd(0x38); //HPM
+	// write_cmd(0x39); //LPM
 
 	write_cmd(0x29); //DISPLAY ON
 
@@ -394,6 +402,7 @@ static void st7305_device_init(void)
 
 }
 
+/* TODO: set the window with given coordinates */
 static void st7305_set_addr_win(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 {
 	write_cmd(0x2A); //Column Address Setting
@@ -410,15 +419,86 @@ static void st7305_set_addr_win(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 static void st7305_clear(uint8_t color)
 {
     st7305_set_addr_win(0, 0, 199, 199);
-    /* TODO: clear display ram */
+
+    for (int i = 0; i < 100; i++) {
+
+            for (int j = 0; j < 8; j++) {
+                write_data(0x00);
+                write_data(0x00);
+                write_data(0x00);
+
+                write_data(0x00);
+                write_data(0x00);
+                write_data(0x00);
+            }
+
+            write_data(0x00);
+            write_data(0x00);
+            write_data(0x00);
+    }
 }
 
-static void st7305_show_pic(const unsigned char *pic, size_t len)
+extern const unsigned char pic1[6800];
+static void st7305_show_pic1(void)
 {
     st7305_set_addr_win(0, 0, 199, 199);
 
-    for (size_t i = 0; i < len; i++)
-        write_data(pic[i]);
+    for (size_t i = 0; i < sizeof(pic1)/sizeof(pic1[0]); i++)
+        write_data(pic1[i]);
+}
+
+static void st7305_disp_test(void)
+{
+    unsigned int i,j;
+
+    st7305_set_addr_win(0, 0, 199, 199);
+
+    for (i = 0; i < 100; i++) {
+
+        if (i % 2 != 0) {
+            for (j = 0; j < 8; j++) {
+                write_data(0x00);
+                write_data(0x00);
+                write_data(0x00);
+
+                write_data(0xff);
+                write_data(0xff);
+                write_data(0xff);
+            }
+
+            write_data(0xff);
+            write_data(0xff);
+            write_data(0xff);
+        } else {
+            for (j = 0; j < 8; j++) {
+                write_data(0xff);
+                write_data(0xff);
+                write_data(0xff);
+
+                write_data(0x00);
+                write_data(0x00);
+                write_data(0x00);
+            }
+
+            write_data(0xff);
+            write_data(0xff);
+            write_data(0xff);
+        }
+    }
+}
+
+/* TODO: st7305_flush */
+static void st7305_flush(void)
+{
+    st7305_set_addr_win(0, 0, 199, 199);
+    for (int i = 0; i < sizeof(st7305_buffer)/sizeof(st7305_buffer[0]); i++)
+        write_data(st7305_buffer[i]);
+}
+
+/* TODO: st7305_draw_pixel */
+static void st7305_draw_pixel(uint8_t x, uint8_t y, bool color)
+{
+
 }
 
 /**
@@ -431,7 +511,7 @@ static void hal_init(void)
 #warning spi/bme280_spi example requires a board with SPI pins
     puts( "Default SPI pins were not defined" );
 #else
-    spi_init( spi_default, 400 * 1000 );
+    spi_init( spi_default, 62500000 );
     gpio_set_function( PICO_DEFAULT_SPI_SCK_PIN, GPIO_FUNC_SPI );
     gpio_set_function( PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI );
     bi_decl( bi_2pins_with_func( PICO_DEFAULT_SPI_TX_PIN, PICO_DEFAULT_SPI_SCK_PIN,
@@ -454,8 +534,6 @@ static void hal_init(void)
 	st7305_device_init();
 #endif
 }
-
-extern const unsigned char pic1[6800];
 int main(void)
 {
     stdio_init_all();
@@ -464,7 +542,16 @@ int main(void)
 
     printf("%s\n", __func__);
 
-	st7305_show_pic(pic1, sizeof(pic1)/sizeof(pic1[0]));
+    // st7305_clear(0);
+	// st7305_show_pic1();
+
+    // sleep_ms(1000);
+
+	write_cmd(0x3A); //Data Format Select
+	write_data(0x11); //10:4write for 24bit ; 11: 3write for 24bit
+
+    st7305_clear(0);
+    st7305_disp_test();
 
     for (;;) {
         tight_loop_contents();
