@@ -1,0 +1,58 @@
+;
+; Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+;
+; SPDX-License-Identifier: BSD-3-Clause
+;
+
+.program test
+.side_set 1
+
+/*
+ * bit period is 1.25us, pio cycle is 166ns.
+ * logic 1: 0.8us high + 0.45us low
+ * logic 0: 0.4us high + 0.85us low
+ */
+.wrap_target
+bitloop:
+    out x, 1        side 0 [3]
+    jmp !x, do_zero side 1 [2]
+    jmp bitloop     side 1 [5]
+do_zero:
+    nop             side 0 [5]
+.wrap
+
+% c-sdk {
+#define WS2812B_CLK_HZ 6000000
+
+static inline void pio_ws2812b_program_init(PIO pio, uint sm, uint offset, uint pin, uint clk_sys_hz) {
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+
+    pio_sm_config c = test_program_get_default_config(offset);
+    sm_config_set_out_pins(&c, pin, 1);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    sm_config_set_clkdiv(&c, clk_sys_hz / 2.f / WS2812B_CLK_HZ);
+    sm_config_set_out_shift(&c, false, true, 24);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+// Making use of the narrow store replication behaviour on RP2040 to get the
+// data left-justified (as we are using shift-to-left to get MSB-first serial)
+
+static inline void pio_ws2812b_put(PIO pio, uint sm, uint8_t x) {
+    while (pio_sm_is_tx_fifo_full(pio, sm))
+        ;
+    *(volatile uint8_t*)&pio->txf[sm] = x;
+}
+
+// SM is done when it stalls on an empty FIFO
+
+static inline void pio_ws2812b_wait_idle(PIO pio, uint sm) {
+    uint32_t sm_stall_mask = 1u << (sm + PIO_FDEBUG_TXSTALL_LSB);
+    pio->fdebug = sm_stall_mask;
+    while (!(pio->fdebug & sm_stall_mask))
+        ;
+}
+%}
